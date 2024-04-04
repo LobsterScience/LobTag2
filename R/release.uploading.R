@@ -1,5 +1,5 @@
 #' @title upload_releases
-#' @import dplyr shiny svDialogs
+#' @import dplyr ROracle DBI shiny DT svDialogs
 #' @description batch uploads tag release data
 #' @export
 
@@ -12,21 +12,21 @@ releases <- read.csv(file_path)
 ## Process / standardize the data table
 
 ##decimal degrees and degrees minutes formatting done here
-releases$latddmm.mm = releases$Lat.Degrees * 100 + releases$Lat.Minutes
-releases$londdmm.mm = releases$Lon.Degrees * 100 + releases$Lon.Minutes
+releases$LATDDMM_MM = releases$LAT_DEGREES * 100 + releases$LAT_MINUTES
+releases$LONDDMM_MM = releases$LON_DEGREES * 100 + releases$LON_MINUTES
 
-releases$latdd.dd = releases$Lat.Degrees + releases$Lat.Minutes / 60
-releases$londd.dd = releases$Lon.Degrees + releases$Lon.Minutes / 60
+releases$LATDD_DD = releases$LAT_DEGREES + releases$LAT_MINUTES / 60
+releases$LONDD_DD = releases$LON_DEGREES + releases$LON_MINUTES / 60
 
 ##date column isn't 100% necessary but it's a good indication if things are going wrong
-releases$Date = paste(releases$Day, releases$Month, releases$Year, sep = "/")
-
+releases$REL_DATE = paste(releases$DAY, releases$MONTH, releases$YEAR, sep = "/")
+releases$TAG_ID = paste0(releases$TAG_PREFIX,releases$TAG_NUM)
 
 ## retrieve only selected variables if there are extra / differently ordered columns
-select.names = c("Vessel", "Captain", "Port", "LFA",  "Sampler", "Sampler.2", "Affiliation", "Day",	"Month", "Year", "Tag.Prefix",	"Tag.Color", "Tag.Num",	"Carapace.Length",	"Sex",	"Shell", "Claw", "V.Notch", "Lat.Degrees",	"Lat.Minutes",	"Lon.Degrees",	"Lon.Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
+select.names = c("SAMPLER"	,"SAMPLER_2",	"AFFILIATION","VESSEL",	"CAPTAIN","PORT",	"LFA",	"DAY",	"MONTH",	"YEAR",	"TAG_COLOR",	"TAG_PREFIX",	"TAG_NUM", "TAG_ID", "CARAPACE_LENGTH",	"SEX",	"SHELL",	"CLAW",	"LAT_DEGREES",	"LAT_MINUTES",	"LON_DEGREES",	"LON_MINUTES", "LATDDMM_MM","LONDDMM_MM","LATDD_DD","LONDD_DD","REL_DATE","COMMENTS")
+
 rel <- dplyr::select(releases,(all_of(select.names)))
-new.names= c("Vessel", "Captain", "Port", "LFA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "V-Notch", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
-names(rel) = new.names
+
 
 ## error checking (Lobster specific, edit for other species / tagging programs):
 # sex_values <- c(NA,0,1,2,3)
@@ -37,60 +37,77 @@ names(rel) = new.names
 # carapace_values_fsrs <- c(NA, 40:170) # fsrs samples some really big females as part of the v-notch program, so increase the threshold in this case.
 
 ########### Testing
-rel[1,27]= NA
-rel[2,13]=NA
+# rel[1,26]= NA
+#  rel[2,12]=NA
+#  rel[3,12]=NA
+#  rel[4,12]=NA
+#  rel[5,13]=NA
+# rel <- rbind(rel,rel[1,])
+# rel <- rbind(rel,rel[1,])
+# rel[6,27]=NA
+# rel[7,26]=NA
 
 
 ## error checking (General):
-repeat_tags = rel$`Tag Num`[duplicated(rel$`Tag Num`)==TRUE & duplicated(rel$`Tag Prefix`)==TRUE]
-bad_tag = rownames(rel)[rel$`Tag Num` %in% NA]
-bad_lat = rel$`Tag Num`[rel$latdd.dd %in% NA | nchar(as.character(rel$latdd.dd))<2 | !is.numeric(rel$latdd.dd)]
-bad_lon = rel$`Tag Num`[rel$londd.dd %in% NA | nchar(as.character(rel$londd.dd))<2 | !is.numeric(rel$londd.dd)]
-bad_date = rel$`Tag Num`[rel$Date %in% NA]
+
+bad_tag_pre = which(rel$TAG_PREFIX %in% NA)
+bad_tag_num = which(rel$TAG_NUM %in% NA | as.numeric(rel$TAG_NUM) %in% NA)
+repeat_tags = which(duplicated(rel$TAG_ID)==TRUE)
+
+bad_lat = which(rel$LATDD_DD %in% NA | nchar(as.character(rel$LATDD_DD))<2 | !is.numeric(rel$LATDD_DD))
+bad_lon = which(rel$LONDD_DD %in% NA | nchar(as.character(rel$LONDD_DD))<2 | !is.numeric(rel$LONDD_DD))
+bad_date = which(rel$REL_DATE %in% NA)
 
 
 error_out= ""
 error_tab = NULL
 return_error = FALSE
 
-if(length(bad_tag) > 0){
-  for(i in 1:length(bad_tag)){
-    error_out = paste(error_out, "\nBad or missing tag at row: ", bad_tag[i], sep = "")
-    error_tab = rbind(error_tab,c(bad_tag[i],"","Bad or missing tag"))
+if(length(bad_tag_pre) > 0){
+  for(i in bad_tag_pre){
+    error_out = paste(error_out, "\nMissing tag prefix for tag number:",rel$TAG_NUM[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Missing tag prefix"))
+  }
+  return_error = TRUE
+}
+if(length(bad_tag_num) > 0){
+  for(i in bad_tag_num){
+    error_out = paste(error_out, "\nBad or missing tag number at row:", i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Bad or missing tag number"))
   }
   return_error = TRUE
 }
 if(length(repeat_tags) > 0){
-  for(i in 1:length(repeat_tags)){
-    error_out = paste(error_out, "\nPossible duplicate tag number: ", repeat_tags[i], sep = "")
-    error_tab = rbind(error_tab,c("",repeat_tags[i],"Possible duplicate tag number"))
+  for(i in repeat_tags){
+    error_out = paste(error_out, "\nDuplicate tag:",rel$TAG_ID[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Duplicate tag prefix and number"))
   }
   return_error = TRUE
 }
 if(length(bad_lat) > 0){
-  for(i in 1:length(bad_lat)){
-    error_out = paste(error_out, "\nBad or missing latitude for tag number: ", bad_lat[i], sep = "")
-    error_tab = rbind(error_tab,c("",bad_lat[i],"Bad or missing latitude"))
+  for(i in bad_lat){
+    error_out = paste(error_out, "\nBad or missing latitude for tag:",rel$TAG_ID[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Bad or missing latitude"))
   }
   return_error = TRUE
 }
 if(length(bad_lon) > 0){
-  for(i in 1:length(bad_lon)){
-    error_out = paste(error_out, "\nBad or missing longitude for tag number: ", bad_lon[i], sep = "")
-    error_tab = rbind(error_tab,c("",bad_lon[i],"Bad or missing longitude"))
+  for(i in bad_lon){
+    error_out = paste(error_out, "\nBad or missing longitude for tag:",rel$TAG_ID[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Bad or missing longitude"))
   }
   return_error = TRUE
 }
 if(length(bad_date) > 0){
-  for(i in 1:length(bad_date)){
-    error_out = paste(error_out, "\nBad or missing date for tag number: ", bad_date[i], sep = "")
-    error_tab = rbind(error_tab,c("",bad_date[i],"Bad or missing date"))
+  for(i in bad_date){
+    error_out = paste(error_out, "\nBad or missing date for tag:", rel$TAG_ID[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Bad or missing date"))
   }
   return_error = TRUE
 }
 
 if(return_error){
-  colnames(error_tab)=c("Row","Tag Number","Error")
+  colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Error")
 ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
 
   # Define the UI
@@ -129,15 +146,102 @@ if(return_error){
 }
 
 if(!return_error){
-  ###### ORACLE UPLOAD HERE
+  ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
+  table_name <- "ELEMENTG.LBT_RELEASES"
+  ### open ORACLE connection
+  tryCatch({
+    drv <- DBI::dbDriver("Oracle")
+    con <- ROracle::dbConnect(drv, username = oracle.lobster.user, password = oracle.lobster.password, dbname = oracle.lobster.server)
+  }, warning = function(w) {
+  }, error = function(e) {
+    return(toJSON("Connection failed"))
+  }, finally = {
+  })
 
-  ######
+  ## check for already entered tags, then upload all new tag entries
+  entered =NULL
+  for(i in 1:nrow(rel)){
+  sql <- paste0("SELECT * FROM ",table_name," WHERE TAG_ID= '",rel$TAG_ID[i],"'")
+  check <- dbSendQuery(con, sql)
+  existing_tag <- dbFetch(check)
+  entered <- rbind(entered,existing_tag)
+  dbClearResult(check)
 
+  if(nrow(existing_tag)==0){
+    sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$LFA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LATDD_DD[i],"','",rel$LONDD_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+    result <- dbSendQuery(con, sql)
+    dbCommit(con)
+    dbClearResult(result)
   }
 
+}
+
+  dbDisconnect(con)
+
+  ### show interactive info window if there were any tags found to be already entered
+ if(nrow(entered)>0){
+  # Define UI for application
+  ui <- fluidPage(
+    titlePanel("Upload Success!"),
+    tags$br(),
+    h4("The following tags already exist in the database so were not uploaded:"),
+    sidebarLayout(
+      sidebarPanel(
+        # Text box to display all TAG_NUM values
+        textOutput("tag_values")
+      ),
+
+      mainPanel(
+        # Display table based on selection
+        DTOutput("table"),
+
+        # Download button
+        downloadButton("download_table", "Download Table")
+      )
+    )
+  )
 
 
+  # Define server logic
+  server <- function(input, output) {
+    # Render unique TAG_NUM values in text box
+    output$tag_values <- renderText({
+      paste(unique(entered$TAG_ID), collapse = ", ")
+    })
+
+    # Render table based on selection
+    output$table <- renderDT({
+      datatable(entered)
+    })
+
+    # Download entire table
+    output$download_table <- downloadHandler(
+      filename = function() {
+        paste("entered_table", ".csv", sep = "")
+      },
+      content = function(file) {
+        write.csv(entered, file, row.names = FALSE)
+      }
+    )
+  }
+
+  # Run the application
+  shinyApp(ui = ui, server = server)
+
+ }else{
+   dlg_message("All releases uploaded successfully! There were no errors and none of the tags were found to already exist.")
+  }
+
+}
+#######  SCRAP
+# new.names= c("Vessel", "Captain", "Port", "LFA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
+
+# library(dplyr)
+# library(ROracle)
+# library(shiny)
+# library(DT)
+# library(svDialogs)
 
 
 }
