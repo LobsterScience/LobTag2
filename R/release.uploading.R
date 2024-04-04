@@ -152,7 +152,7 @@ if(!return_error){
   ### open ORACLE connection
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.lobster.user, password = oracle.lobster.password, dbname = oracle.lobster.server)
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
   }, warning = function(w) {
   }, error = function(e) {
     return(toJSON("Connection failed"))
