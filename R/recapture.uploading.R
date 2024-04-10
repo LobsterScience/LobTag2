@@ -1,10 +1,9 @@
 #' @title upload_recaptures
-#' @import dplyr ROracle DBI shiny svDialogs
+#' @import dplyr ROracle DBI shiny shinyjs svDialogs
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
 upload_recaptures <- function(){
-
 
 
   # Define UI for application
@@ -16,20 +15,33 @@ upload_recaptures <- function(){
     # Title
     titlePanel("Upload Recaptured Tags"),
 
+    # CSS Style for Mandatory Fields
+    tags$style(HTML("
+    .mandatory-field input[type='text'],
+    .mandatory-field input[type='number'],
+    .mandatory-field input[type='date'],
+    .mandatory-field select {
+      border-color: #007bff; /* Blue border color */
+    }
+  ")),
+
     # Sidebar layout
     sidebarLayout(
 
       # Sidebar panel for inputs
       sidebarPanel(
 
-        # Input for Tag Prefix
-        textInput("tag_prefix", "Tag Prefix:", ""),
+        # Input for Tag Prefix (Mandatory)
+        div(class = "mandatory-field",
+            textInput("tag_prefix", "Tag Prefix:", "")),
 
-        # Input for Tag Number
-        numericInput("tag_number", "Tag Number:", value = NULL, min = 0, step = 1),
+        # Input for Tag Number (Mandatory)
+        div(class = "mandatory-field",
+            numericInput("tag_number", "Tag Number:", value = NULL, min = 0, step = 1)),
 
-        # Input for Date
-        dateInput("date", "Date:", ""),
+        # Input for Date (Mandatory)
+        div(class = "mandatory-field",
+            dateInput("date", "Date:", "")),
 
         # Input: Person
         textInput("person", "Person"),
@@ -56,17 +68,21 @@ upload_recaptures <- function(){
         # Input: Person 2
         textInput("person2", "Person 2"),
 
-        # Input: Latitude Degrees
-        numericInput("lat_deg", "Latitude Degrees:", value = NULL, min = -90, max = 90),
+        # Input: Latitude Degrees (Mandatory)
+        div(class = "mandatory-field",
+            numericInput("lat_deg", "Latitude Degrees:", value = NULL, min = -90, max = 90)),
 
-        # Input: Latitude Decimal Minutes
-        numericInput("lat_dec_min", "Latitude Decimal Minutes:", value = NULL, min = 0, max = 59.99, step = 0.01),
+        # Input: Latitude Decimal Minutes (Mandatory)
+        div(class = "mandatory-field",
+            numericInput("lat_dec_min", "Latitude Decimal Minutes:", value = NULL, min = 0, max = 59.99, step = 0.01)),
 
-        # Input: Longitude Degrees
-        numericInput("long_deg", "Longitude Degrees:", value = NULL, min = -180, max = 180),
+        # Input: Longitude Degrees (Mandatory)
+        div(class = "mandatory-field",
+            numericInput("long_deg", "Longitude Degrees:", value = NULL, min = -180, max = 180)),
 
-        # Input: Longitude Decimal Minutes
-        numericInput("long_dec_min", "Longitude Decimal Minutes:", value = NULL, min = 0, max = 59.99, step = 0.01),
+        # Input: Longitude Decimal Minutes (Mandatory)
+        div(class = "mandatory-field",
+            numericInput("long_dec_min", "Longitude Decimal Minutes:", value = NULL, min = 0, max = 59.99, step = 0.01)),
 
         # Input: Depth Fathoms
         numericInput("depth_fathoms", "Depth (fathoms):", value = NULL, min = 0),
@@ -208,13 +224,14 @@ upload_recaptures <- function(){
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
       # Prepare SQL insert statement
-      sql_1 <- paste("INSERT INTO ELEMENTG.TEST (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD_DDDD, LON_DD_DDDD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
+      sql_1 <- paste("INSERT INTO ELEMENTG.LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD_DDDD, LON_DD_DDDD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
 
       # Execute SQL insert statement
       dbExecute(con, sql_1)
 
-      # Prepare SQL update/insert statement for the LBT_PEOPLE table
-      sql_2 <- paste("
+      # Prepare SQL update/insert statement for the LBT_PEOPLE table and insert data
+      if (nchar(input$person) > 0){
+        sql_2 <- paste("
       MERGE INTO ELEMENTG.LBT_PEOPLE tgt
       USING (SELECT '", input$person, "' AS name FROM dual) src
       ON (tgt.NAME = src.name)
@@ -232,14 +249,15 @@ upload_recaptures <- function(){
       WHEN NOT MATCHED THEN
       INSERT (tgt.NAME, tgt.CIVIC, tgt.TOWN, tgt.PROV, tgt.COUNTRY, tgt.POST, tgt.EMAIL, tgt.PHO1, tgt.PHO2, tgt.AFFILIATION, tgt.LICENSE_AREA)
       VALUES ('", input$person, "', '", input$street_address, "', '", input$town, "', '", input$province, "', '", input$country, "', '", input$postal_code, "', '", input$email, "', '", input$phone1, "', '", input$phone2, "', '", input$affiliation, "', '", input$license_area, "')"
-                     , sep = "")
+                       , sep = "")
 
-      # Execute SQL update/insert statement for the LBT_PEOPLE table
-      dbExecute(con, sql_2)
+        # Execute SQL update/insert statement for the LBT_PEOPLE table
+        dbExecute(con, sql_2)
+      }
 
       # Update status
       output$status <- renderText({
-        "Data uploaded to Oracle table ELEMENTG.TEST"
+        "Tags to be uploaded to Oracle. Close this window to complete upload."
       })
 
       # Add submitted data to the table
@@ -286,14 +304,6 @@ upload_recaptures <- function(){
 
 
 
-
-
-  ########SCRAP
-  # library(dplyr)
-  # library(svDialogs)
-  # library(shiny)
-  # library(shinyjs)
-  # library(ROracle)
 
 
 
