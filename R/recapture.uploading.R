@@ -310,8 +310,24 @@ upload_recaptures <- function(){
 }
 
 
+#' @title batch_upload_recaptures
+#' @import dplyr ROracle DBI shiny DT svDialogs
+#' @description batch uploads tag recaptures data
+#' @export
+batch_upload_recaptures <- function(){
+  ## Allow user to choose data file to upload
+  dlg_message("In the following window, choose a csv file containing your recaptures data")
+  file_path <- dlg_open(filter = dlg_filters["csv",])$res
+  recaptures <- read.csv(file_path)
+  rec <- recaptures
+  ## Process / standardize the data table
+  ## check what coordinate is provided and autofill if necessary
+  for (i in nrow(rec)){
+    rec <- rec %>% mutate(LAT_DD =ifelse(LAT_DD %in% NA,
+                                         if(LAT_DEGREE<0){}))
+  }
 
-
+}
 
 
 
