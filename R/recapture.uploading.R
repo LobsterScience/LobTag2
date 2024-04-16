@@ -321,14 +321,238 @@ batch_upload_recaptures <- function(){
   recaptures <- read.csv(file_path)
   rec <- recaptures
   ## Process / standardize the data table
+
+  ##testing
+  # rec[1,12] =NA
+  # rec[2,12] = NA
+  # rec[2,13] =NA
+  # rec[2,8] = 44
+  # rec[2,9] =33.456
+  # rec[2,10] = -63
+  # rec[2,11] =-34.456
+  # rec <- rbind(rec,rec[1,])
+
   ## check what coordinate is provided and autofill if necessary
-  for (i in nrow(rec)){
-    rec <- rec %>% mutate(LAT_DD =ifelse(LAT_DD %in% NA,
-                                         if(LAT_DEGREE<0){}))
+  for (i in 1:nrow(rec)){
+
+    if(is.na(rec$LAT_DD[i])){
+      if(!is.na(rec$LAT_MINUTE[i]) & rec$LAT_MINUTE[i]<0){rec$LAT_MINUTE[i]=rec$LAT_MINUTE[i]*(-1)}
+      if(!is.na(rec$LAT_DEGREE[i]) & rec$LAT_DEGREE[i]<0){
+        rec$LAT_DD[i] = rec$LAT_DEGREE[i] - rec$LAT_MINUTE[i]/60
+      }else{rec$LAT_DD[i] = rec$LAT_DEGREE[i] + rec$LAT_MINUTE[i]/60}
+    }
+
+    if(is.na(rec$LON_DD[i])){
+      if(rec$LON_MINUTE[i]<0){rec$LON_MINUTE[i]=rec$LON_MINUTE[i]*(-1)}
+      if(rec$LON_DEGREE[i]<0){
+        rec$LON_DD[i] = rec$LON_DEGREE[i] - rec$LON_MINUTE[i]/60
+      }else{rec$LON_DD[i] = rec$LON_DEGREE[i] + rec$LON_MINUTE[i]/60}
+    }
+
   }
 
+  rec <- rec %>% mutate(TAG_ID = paste0(TAG_PREFIX,as.character(TAG_NUMBER)))
+  rec <- rec %>% mutate(REC_DATE = paste(DAY,MONTH,YEAR, sep="/"))
+  rec$REC_DATE = format(as.Date(rec$REC_DATE, format = "%d/%m/%Y"), "%d/%m/%Y")
+  ## clean vessel names for problematic characters
+  rec$VESSEL = gsub("'","",rec$VESSEL)
+
+  ## error checking (General):
+  bad_tag_pre = which(rec$TAG_PREFIX %in% NA)
+  bad_tag_num = which(rec$TAG_NUMBER %in% NA | as.numeric(rec$TAG_NUMBER) %in% NA)
+
+  bad_lat = which(rec$LAT_DD %in% NA | nchar(as.character(rec$LAT_DD))<2 | !is.numeric(rec$LAT_DD))
+  bad_lon = which(rec$LON_DD %in% NA | nchar(as.character(rec$LON_DD))<2 | !is.numeric(rec$LON_DD))
+  bad_date = which(rec$REL_DATE %in% NA)
+
+  ## check if any recapture events seems to be replicates
+  rec <- rec %>% mutate(reps = paste(TAG_ID,REC_DATE,LAT_DD,LON_DD))
+  repeat_event = which(duplicated(rec$reps)==TRUE)
+
+  error_out= ""
+  error_tab = NULL
+  return_error = FALSE
+
+  if(length(bad_tag_pre) > 0){
+    for(i in bad_tag_pre){
+      error_out = paste(error_out, "\nMissing tag prefix for tag number:",rec$TAG_NUMBER[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Missing tag prefix"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_tag_num) > 0){
+    for(i in bad_tag_num){
+      error_out = paste(error_out, "\nBad or missing tag number at row:", i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad or missing tag number"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lat) > 0){
+    for(i in bad_lat){
+      error_out = paste(error_out, "\nBad or missing latitude for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad or missing latitude"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lon) > 0){
+    for(i in bad_lon){
+      error_out = paste(error_out, "\nBad or missing longitude for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad or missing longitude"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_date) > 0){
+    for(i in bad_date){
+      error_out = paste(error_out, "\nBad or missing date for tag:", rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad or missing date"))
+    }
+    return_error = TRUE
+  }
+  if(length(repeat_event) > 0){
+    for(i in repeat_event){
+      error_out = paste(error_out, "\nDuplicate recapture event suspected for:", rec$TAG_ID[i],"at row:",i,"Is this really a separate recapture event?")
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Suspected duplicate recapture event"))
+    }
+    return_error = TRUE
+  }
+
+  if(return_error){
+    colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Error")
+    ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
+
+    # Define the UI
+    ui <- fluidPage(
+      titlePanel("Uploading Errors"),
+      mainPanel(
+        # Display text from the string variable
+        h3("Fix issues below and try uploading again:"),
+        verbatimTextOutput("text_output"),
+
+        # Button to download the table
+        downloadButton("download_table", label = "Download Table")
+      )
+    )
+
+    # Define the server logic
+    server <- function(input, output) {
+      # Display the text from the string variable
+      output$text_output <- renderText({
+        error_out
+      })
+
+      # Function to generate a downloadable file
+      output$download_table <- downloadHandler(
+        filename = function() {
+          "recaptures_uploading_errors.csv"
+        },
+        content = function(file) {
+          write.csv(error_tab, file,row.names = F)
+        }
+      )
+    }
+
+    # Create the Shiny app object
+    return(shinyApp(ui = ui, server = server))
+  }
+
+  if(!return_error){
+    ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
+
+    table_name <- "ELEMENTG.LBT_RECAPTURES"
+    ### open ORACLE connection
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+
+    ## check for already entered recapture events, then upload all new recaptures
+    entered =NULL
+    for(i in 1:nrow(rec)){
+      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
+      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+
+      check <- dbSendQuery(con, sql)
+      existing_event <- dbFetch(check)
+      entered <- rbind(entered,existing_event)
+      dbClearResult(check)
+
+      if(nrow(existing_event)==0){
+        sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELCODE[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+        result <- dbSendQuery(con, sql)
+        dbCommit(con)
+        dbClearResult(result)
+      }
+
+    }
+
+    dbDisconnect(con)
+
+    ### show interactive info window if there were any tags found to be already entered
+    if(nrow(entered)>0){
+      # Define UI for application
+      ui <- fluidPage(
+        titlePanel("Upload Success!"),
+        tags$br(),
+        h4("Recaptures for the following tags on the same day were found already in the database, these are assumed to be the same event so were not uploaded:"),
+        sidebarLayout(
+          sidebarPanel(
+            # Text box to display all TAG_NUM values
+            textOutput("tag_values")
+          ),
+
+          mainPanel(
+            # Display table based on selection
+            DTOutput("table"),
+
+            # Download button
+            downloadButton("download_table", "Download Table")
+          )
+        )
+      )
+
+
+      # Define server logic
+      server <- function(input, output) {
+        # Render unique TAG_NUM values in text box
+        output$tag_values <- renderText({
+          paste(unique(entered$TAG_ID), collapse = ", ")
+        })
+
+        # Render table based on selection
+        output$table <- renderDT({
+          datatable(entered)
+        })
+
+        # Download entire table
+        output$download_table <- downloadHandler(
+          filename = function() {
+            paste("entered_table", ".csv", sep = "")
+          },
+          content = function(file) {
+            write.csv(entered, file, row.names = FALSE)
+          }
+        )
+      }
+
+      # Run the application
+      shinyApp(ui = ui, server = server)
+
+    }else{
+      dlg_message("All recaptures uploaded successfully without errors!")
+    }
+
+
+
+  }
+
+
 }
-
-
-
-
+# library(dplyr)
+# library(ROracle)
+# library(shiny)
+# library(svDialogs)
+#library(DT)

@@ -4,7 +4,11 @@
 \alias{generate_paths}
 \title{generate_paths}
 \usage{
-generate_paths()
+generate_paths(
+  depth.raster.path = "C:/bio.data/bio.lobster/data/tagging/depthraster2.tif",
+  neighborhood = 16,
+  type = "least.cost"
+)
 }
 \description{
 Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
