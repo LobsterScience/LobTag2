@@ -8,25 +8,29 @@ upload_releases <- function(){
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose a csv file containing your releases data")
 file_path <- dlg_open(filter = dlg_filters["csv",])$res
-releases <- read.csv(file_path)
+releases <- read.csv(file_path, na.strings = "")
 ## Process / standardize the data table
 
 ##decimal degrees and degrees minutes formatting done here
 releases$LATDDMM_MM = releases$LAT_DEGREES * 100 + releases$LAT_MINUTES
 releases$LONDDMM_MM = releases$LON_DEGREES * 100 + releases$LON_MINUTES
 
-releases$LATDD_DD = releases$LAT_DEGREES + releases$LAT_MINUTES / 60
-releases$LONDD_DD = releases$LON_DEGREES + releases$LON_MINUTES / 60
+releases$LAT_DD = releases$LAT_DEGREES + releases$LAT_MINUTES / 60
+releases$LON_DD = releases$LON_DEGREES + releases$LON_MINUTES / 60
 
 ##date column isn't 100% necessary but it's a good indication if things are going wrong
 releases$REL_DATE = paste(releases$DAY, releases$MONTH, releases$YEAR, sep = "/")
 releases$TAG_ID = paste0(releases$TAG_PREFIX,releases$TAG_NUM)
 
 ## retrieve only selected variables if there are extra / differently ordered columns
-select.names = c("SAMPLER"	,"SAMPLER_2",	"AFFILIATION","VESSEL",	"CAPTAIN","PORT",	"LFA",	"DAY",	"MONTH",	"YEAR",	"TAG_COLOR",	"TAG_PREFIX",	"TAG_NUM", "TAG_ID", "CARAPACE_LENGTH",	"SEX",	"SHELL",	"CLAW",	"LAT_DEGREES",	"LAT_MINUTES",	"LON_DEGREES",	"LON_MINUTES", "LATDDMM_MM","LONDDMM_MM","LATDD_DD","LONDD_DD","REL_DATE","COMMENTS")
+select.names = c("SAMPLER"	,"SAMPLER_2",	"AFFILIATION","VESSEL",	"CAPTAIN","PORT",	"MANAGEMENT_AREA",	"DAY",	"MONTH",	"YEAR",	"TAG_COLOR",	"TAG_PREFIX",	"TAG_NUM", "TAG_ID", "CARAPACE_LENGTH",	"SEX",	"SHELL",	"CLAW",	"LAT_DEGREES",	"LAT_MINUTES",	"LON_DEGREES",	"LON_MINUTES", "LATDDMM_MM","LONDDMM_MM","LAT_DD","LON_DD","REL_DATE","COMMENTS")
 
 rel <- dplyr::select(releases,(all_of(select.names)))
-
+## clean variables for problematic characters
+rel$VESSEL = gsub("'","",rel$VESSEL)
+rel$PORT = gsub("'","",rel$PORT)
+#\ rel$PORT = gsub("\\(","-",rel$PORT)
+# rel$PORT = gsub("\\)","-",rel$PORT)
 
 ## error checking (Lobster specific, edit for other species / tagging programs):
 # sex_values <- c(NA,0,1,2,3)
@@ -54,8 +58,8 @@ bad_tag_pre = which(rel$TAG_PREFIX %in% NA)
 bad_tag_num = which(rel$TAG_NUM %in% NA | as.numeric(rel$TAG_NUM) %in% NA)
 repeat_tags = which(duplicated(rel$TAG_ID)==TRUE)
 
-bad_lat = which(rel$LATDD_DD %in% NA | nchar(as.character(rel$LATDD_DD))<2 | !is.numeric(rel$LATDD_DD))
-bad_lon = which(rel$LONDD_DD %in% NA | nchar(as.character(rel$LONDD_DD))<2 | !is.numeric(rel$LONDD_DD))
+bad_lat = which(rel$LAT_DD %in% NA | nchar(as.character(rel$LAT_DD))<2 | !is.numeric(rel$LAT_DD))
+bad_lon = which(rel$LON_DD %in% NA | nchar(as.character(rel$LON_DD))<2 | !is.numeric(rel$LON_DD))
 bad_date = which(rel$REL_DATE %in% NA)
 
 
@@ -169,7 +173,7 @@ if(!return_error){
   dbClearResult(check)
 
   if(nrow(existing_tag)==0){
-    sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$LFA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LATDD_DD[i],"','",rel$LONDD_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+    sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
     result <- dbSendQuery(con, sql)
     dbCommit(con)
     dbClearResult(result)
@@ -235,7 +239,7 @@ if(!return_error){
 
 }
 #######  SCRAP
-# new.names= c("Vessel", "Captain", "Port", "LFA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
+# new.names= c("Vessel", "Captain", "Port", "MANAGEMENT_AREA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
 
 # library(dplyr)
 # library(ROracle)

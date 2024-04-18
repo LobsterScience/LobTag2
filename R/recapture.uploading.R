@@ -23,6 +23,11 @@ upload_recaptures <- function(){
     .mandatory-field select {
       border-color: #007bff; /* Blue border color */
     }
+        .error-input {
+      border-color: red; /* Set border color to red */
+      background-color: #FEE; /* Add a light red background */
+      color: #A00; /* Change text color to a darker red */
+    }
   ")),
 
     # Sidebar layout
@@ -88,7 +93,7 @@ upload_recaptures <- function(){
         numericInput("depth_fathoms", "Depth (fathoms):", value = NULL, min = 0),
 
         # Input: Released
-        selectInput("relcode", "Released?",choices = c("","1", "2", "3")),
+        selectInput("relcode", "Released?",choices = c("","yes", "no", "unknown")),
 
         # Input: Captain
         textInput("captain", "Captain"),
@@ -151,6 +156,29 @@ upload_recaptures <- function(){
                      username = oracle.personal.user,
                      password = oracle.personal.password,
                      dbname = oracle.personal.server)
+
+    # Observer to check if Tag Prefix and Tag Number combination exists in the Oracle table
+    observeEvent(c(input$tag_prefix, input$tag_number), {
+      if (nchar(input$tag_prefix) > 0 & is.numeric(input$tag_number)) {
+        query <- paste("SELECT * FROM ELEMENTG.LBT_RELEASES WHERE TAG_PREFIX = '", input$tag_prefix, "' AND TAG_NUM = ", input$tag_number, sep = "")
+        result <- dbGetQuery(con, query)
+        if (nrow(result) == 0) {
+          # Update style and display warning message if combination not found
+          shinyjs::addClass("tag_number", "error-input")
+          shinyjs::addClass("tag_prefix", "error-input")
+          output$release_error <- renderText({
+            "No release data found for this tag"
+          })
+        } else {
+          # Remove error style and message if combination found
+          shinyjs::removeClass("tag_number", "error-input")
+          shinyjs::removeClass("tag_prefix", "error-input")
+          output$release_error <- renderText({
+            ""
+          })
+        }
+      }
+    })
 
     # Real-time data retrieval based on "Person" field input
     observeEvent(input$person, {
@@ -224,7 +252,7 @@ upload_recaptures <- function(){
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
       # Prepare SQL insert statement
-      sql_1 <- paste("INSERT INTO ELEMENTG.LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD_DDDD, LON_DD_DDDD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
+      sql_1 <- paste("INSERT INTO ELEMENTG.LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
 
       # Execute SQL insert statement
       dbExecute(con, sql_1)
@@ -459,6 +487,7 @@ batch_upload_recaptures <- function(){
     ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
     table_name <- "ELEMENTG.LBT_RECAPTURES"
+    people.tab.name <- "ELEMENTG.LBT_PEOPLE"
     ### open ORACLE connection
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
@@ -474,7 +503,6 @@ batch_upload_recaptures <- function(){
     for(i in 1:nrow(rec)){
       #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
       sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
-
       check <- dbSendQuery(con, sql)
       existing_event <- dbFetch(check)
       entered <- rbind(entered,existing_event)
@@ -482,6 +510,19 @@ batch_upload_recaptures <- function(){
 
       if(nrow(existing_event)==0){
         sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELCODE[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+        result <- dbSendQuery(con, sql)
+        dbCommit(con)
+        dbClearResult(result)
+      }
+
+      ## check and update PEOPLE table if person is new
+      sql <- paste("SELECT * FROM ",people.tab.name, " WHERE NAME = '", rec$PERSON[i],"'",sep = "")
+      check <- dbSendQuery(con, sql)
+      existing_person <- dbFetch(check)
+      dbClearResult(check)
+
+      if(nrow(existing_person)==0){
+        sql <- paste("INSERT INTO ",people.tab.name, " VALUES ('",rec$PERSON[i],"', '",rec$CIVIC[i],"', '",rec$TOWN[i],"', '",rec$PROV[i],"','",rec$COUNTRY[i],"','",rec$POST[i],"','",rec$EMAIL[i],"','",rec$PHO1[i],"','",rec$PHO2[i],"','",rec$AFFILIATION[i],"','",rec$LICENSE_AREA[i],"')", sep = "")
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
@@ -548,11 +589,12 @@ batch_upload_recaptures <- function(){
 
 
   }
-
+  # library(dplyr)
+  # library(ROracle)
+  # library(shiny)
+  # library(shinyjs)
+  # library(svDialogs)
+  # library(DT)
 
 }
-# library(dplyr)
-# library(ROracle)
-# library(shiny)
-# library(svDialogs)
-#library(DT)
+

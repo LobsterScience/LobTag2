@@ -25,9 +25,9 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
   releases <- ROracle::dbSendQuery(conn, query)
   releases <- ROracle::fetch(releases)
 
-  rel.prep <- releases %>% dplyr::select(TAG_ID, LATDD_DD,LONDD_DD, REL_DATE,TAG_NUM,TAG_PREFIX) %>% rename(rel_lat = LATDD_DD, rel_lon = LONDD_DD)
-  rec.prep <- recaptures %>% dplyr::select(TAG_ID, LAT_DD_DDDD,LON_DD_DDDD,REC_DATE) %>% rename(rec_lat = LAT_DD_DDDD, rec_lon = LON_DD_DDDD)
-  x <- left_join(rec.prep,rel.prep)
+  rel.prep <- releases %>% dplyr::select(TAG_ID, LAT_DD,LON_DD, REL_DATE,TAG_NUM,TAG_PREFIX) %>% rename(rel_lat = LAT_DD, rel_lon = LON_DD)
+  rec.prep <- recaptures %>% dplyr::select(TAG_ID, LAT_DD,LON_DD,REC_DATE) %>% rename(rec_lat = LAT_DD, rec_lon = LON_DD)
+  pdat <- left_join(rec.prep,rel.prep)
 
   ## prepare depth raster
   trans = NULL
@@ -68,19 +68,18 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
       if(x$PID[i] == previd){
         count = count + 1
         #print(paste0("row 57: ", count))
-      }
-      else{
+      }else{
         previd = x$PID[i]
         count = 1 + sum(dat$TID == x$PID[i])
         #print(paste0("row 62: ", count))
       }
       start <- c(as.numeric(x$rel_lon[i]), as.numeric(x$rel_lat[i]))
-      end <- c(as.numeric(x$rec_lon[i]), as.numeric(x$rel_lat[i]))
+      if(any(start %in% NA)){return(base::message("ERROR! There are recaptured tags that don't have initial release coordinates!"))}
+      end <- c(as.numeric(x$rec_lon[i]), as.numeric(x$rec_lat[i]))
 
       if(abs(start[1] - end[1]) < res(trans)[1] && abs(start[2] - end[2]) < res(trans)[1] || is.na(cellFromXY(r, start)) || is.na(cellFromXY(r, end))){
         AtoB = rbind(start, end)
-      }
-      else{
+      }else{
         AtoB = shortestPath(trans, start, end, output="SpatialLines")
       }
       cor = data.frame(coordinates(AtoB))
@@ -150,7 +149,10 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
     print("No new paths created.")  }
 
 
-
+  # library(dplyr)
+  # library(raster)
+  # library(gdistance)
+  # library(PBSmapping)
 
 
   }
@@ -195,9 +197,6 @@ create_sql_query = function(lbt_table, df){
   sql_call = paste(all_start, values, footer, sep = "")
   return(sql_call)
 }
-
-
-
 
 
 
