@@ -44,6 +44,9 @@ upload_recaptures <- function(){
         div(class = "mandatory-field",
             numericInput("tag_number", "Tag Number:", value = NULL, min = 0, step = 1)),
 
+        # Placeholder for no release error message
+        uiOutput("release_error"),
+
         # Input for Date (Mandatory)
         div(class = "mandatory-field",
             dateInput("date", "Date:", "")),
@@ -167,7 +170,7 @@ upload_recaptures <- function(){
           shinyjs::addClass("tag_number", "error-input")
           shinyjs::addClass("tag_prefix", "error-input")
           output$release_error <- renderText({
-            "No release data found for this tag"
+            HTML("<span style='color: red;'>No release data found for this tag!</span>")
           })
         } else {
           # Remove error style and message if combination found
