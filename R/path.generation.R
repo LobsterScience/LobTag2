@@ -50,7 +50,7 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
   dat <-  ROracle::fetch(dat)
   ROracle::dbDisconnect(conn)
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
-  if(length(pathed)>0){x = pdat[-pathed,]}
+  if(length(pathed)>0){x = pdat[-pathed,]}else{x=pdat}
 
   ## create paths
   x <- x %>% rename(PID=TAG_ID)
