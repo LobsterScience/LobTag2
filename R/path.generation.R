@@ -26,7 +26,8 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
   releases <- ROracle::fetch(releases)
 
   rel.prep <- releases %>% dplyr::select(TAG_ID, LAT_DD,LON_DD, REL_DATE,TAG_NUM,TAG_PREFIX) %>% rename(rel_lat = LAT_DD, rel_lon = LON_DD)
-  rec.prep <- recaptures %>% dplyr::select(TAG_ID, LAT_DD,LON_DD,REC_DATE) %>% rename(rec_lat = LAT_DD, rec_lon = LON_DD)
+  rec.prep <- recaptures %>% dplyr::select(TAG_ID, LAT_DD,LON_DD,REC_DATE,PERSON) %>% rename(rec_lat = LAT_DD, rec_lon = LON_DD)
+  rec.prep$REC_DATE = as.Date(rec.prep$REC_DATE, format= "%d/%m/%Y")
   pdat <- left_join(rec.prep,rel.prep)
 
   ## prepare depth raster
@@ -62,7 +63,7 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
   count = 1
   previd = ""
   if(nrow(x) == 0){base::message("No new paths to create!")}else{
-    x <- arrange(x,PID)
+    x <- x %>% arrange(PID,REC_DATE)
     dat <- arrange(dat,TID)
     for(i in 1:nrow(x)){
       if(x$PID[i] == previd){
