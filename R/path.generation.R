@@ -68,13 +68,14 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
     for(i in 1:nrow(x)){
       if(x$PID[i] == previd){
         count = count + 1
+        start <- c(as.numeric(x$rec_lon[i-1]), as.numeric(x$rec_lat[i-1]))
         #print(paste0("row 57: ", count))
       }else{
         previd = x$PID[i]
         count = 1 + sum(dat$TID == x$PID[i])
+        start <- c(as.numeric(x$rel_lon[i]), as.numeric(x$rel_lat[i]))
         #print(paste0("row 62: ", count))
       }
-      start <- c(as.numeric(x$rel_lon[i]), as.numeric(x$rel_lat[i]))
       if(any(start %in% NA)){return(base::message("ERROR! There are recaptured tags that don't have initial release coordinates!"))}
       end <- c(as.numeric(x$rec_lon[i]), as.numeric(x$rec_lat[i]))
 
@@ -112,7 +113,13 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
       tpoly = as.PolySet(cor, projection = "LL")
       leng = calcLength (tpoly, rollup = 3, close = FALSE) #km
 
-      dxp = cbind(rep(x$PID[i], nrow(cor)),rep(count, nrow(cor)), 1:nrow(cor), cor$X, cor$Y,x$TAG_NUM[i],x$TAG_PREFIX[i])
+      events <- NULL
+      for(j in 1:nrow(cor)){
+        if(j<nrow(cor)){events <- rbind(events,c(x$REL_DATE[i],NA,NA))}
+        if(j==nrow(cor)){events <- rbind(events,c(x$REL_DATE[i],format(x$REC_DATE[i], "%d/%m/%Y"),x$PERSON[i]))}
+      }
+
+      dxp = cbind(rep(x$PID[i], nrow(cor)),rep(count, nrow(cor)), 1:nrow(cor), cor$X, cor$Y,x$TAG_NUM[i],x$TAG_PREFIX[i],events)
       dxtowrite = rbind(dxtowrite, dxp)
       df2towrite = rbind(df2towrite, cbind(x$PID[i], count, as.character(x$REC_DATE[i]), leng$length, x$TAG_NUM[i],x$TAG_PREFIX[i]))
 
@@ -128,7 +135,7 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
     #tax prefix and number should follow through
     names(dftowrite) = c("ID", "LON", "LAT", "CDATE", "DIST", "TAG_NUM","TAG_PREFIX")
     names(df2towrite) = c("TID", "CID", "CDATE", "DIST", "TAG_NUM","TAG_PREFIX")
-    names(dxtowrite) = c("TID", "CID", "POS", "LON", "LAT", "TAG_NUM","TAG_PREFIX")
+    names(dxtowrite) = c("TID", "CID", "POS", "LON", "LAT", "TAG_NUM","TAG_PREFIX","REL_DATE","REC_DATE","REC_PERSON")
 
     #add data to oracle
     drv <- DBI::dbDriver("Oracle")

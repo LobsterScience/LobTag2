@@ -1,27 +1,30 @@
 library(dplyr)
 library(basemaps)
 library(svDialogs)
-library(shiny)
-
-library(rgeos)
-library(sp)
-library(spatstat)
-library(shadowtext)
+library(sf)
 library(ggplot2)
-library(ggmap)
-library(ggthemes)
-library(ggrepel)
-library(geosphere)
-library(RStoolbox)
-library(raster)
 library(ggsflabel)
+#library(shiny)
+
+# library(rgeos)
+# library(sp)
+# library(spatstat)
+# library(shadowtext)
+# library(ggplot2)
+# library(ggmap)
+# library(ggthemes)
+# library(ggrepel)
+# library(geosphere)
+# library(RStoolbox)
+# library(raster)
+#
 
 #' @title generate_maps
-#' @import dplyr sf ggsflabel basemaps svDialogs ROracle DBI shinyjs shiny
+#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle DBI
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",person=NULL)
+generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",person=NULL){
 
 
 
@@ -42,35 +45,35 @@ sql = paste("SELECT * FROM ELEMENTG.LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
-##recaptures
-query = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
-recaptures <- ROracle::dbSendQuery(conn, query)
-rec <- ROracle::fetch(recaptures)
-
-##releases
-cap.samps <- paste0("('",paste(rec$TAG_ID, collapse ="','"),"')")
-query = paste("SELECT * FROM ELEMENTG.LBT_RELEASES WHERE TAG_ID in",cap.samps)
-releases <- ROracle::dbSendQuery(conn, query)
-rel <- ROracle::fetch(releases)
+# ##recaptures
+# query = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
+# recaptures <- ROracle::dbSendQuery(conn, query)
+# rec <- ROracle::fetch(recaptures)
+#
+# ##releases
+# cap.samps <- paste0("('",paste(rec$TAG_ID, collapse ="','"),"')")
+# query = paste("SELECT * FROM ELEMENTG.LBT_RELEASES WHERE TAG_ID in",cap.samps)
+# releases <- ROracle::dbSendQuery(conn, query)
+# rel <- ROracle::fetch(releases)
 
 ##
 ROracle::dbDisconnect(conn)
 
-#### make table with all recaptures and their release information
-## Prepare recaptures
-rec <- rec %>% mutate(lat = LAT_DD) %>% mutate(lon = LON_DD)
-rec <- rec %>% mutate(trip = paste(lat,lon,REC_DATE))
-rec <- rec %>% mutate(REC_DATE = as.Date(REC_DATE, format= "%d/%m/%Y"))
-rec <- rec %>% mutate(REC_DATE = format(REC_DATE, "%d-%b-%Y"))
-rec <- rec %>% dplyr::select(TAG_ID,REC_DATE,YEAR,LAT_DD,LON_DD,PERSON,trip)
-rec <- rec %>% rename(REC_YEAR = YEAR, REC_LAT= LAT_DD,REC_LON = LON_DD)
-
-## Prepare releases
-rel <- rel %>% rename(REL_LAT = LAT_DD, REL_LON = LON_DD, REL_YEAR = YEAR)
-rel <- rel %>% mutate(REL_DATE = as.Date(REL_DATE, format= "%d/%m/%Y"))
-rel <- rel %>% mutate(REL_DATE = format(REL_DATE, "%d-%b-%Y"))
-
-dat <- left_join(rec,rel)
+# #### make table with all recaptures and their release information
+# ## Prepare recaptures
+# rec <- rec %>% mutate(lat = LAT_DD) %>% mutate(lon = LON_DD)
+# rec <- rec %>% mutate(trip = paste(lat,lon,REC_DATE))
+# rec <- rec %>% mutate(REC_DATE = as.Date(REC_DATE, format= "%d/%m/%Y"))
+# rec <- rec %>% mutate(REC_DATE = format(REC_DATE, "%d-%b-%Y"))
+# rec <- rec %>% dplyr::select(TAG_ID,REC_DATE,YEAR,LAT_DD,LON_DD,PERSON,trip)
+# rec <- rec %>% rename(REC_YEAR = YEAR, REC_LAT= LAT_DD,REC_LON = LON_DD)
+#
+# ## Prepare releases
+# rel <- rel %>% rename(REL_LAT = LAT_DD, REL_LON = LON_DD, REL_YEAR = YEAR)
+# rel <- rel %>% mutate(REL_DATE = as.Date(REL_DATE, format= "%d/%m/%Y"))
+# rel <- rel %>% mutate(REL_DATE = format(REL_DATE, "%d-%b-%Y"))
+#
+# dat <- left_join(rec,rel)
 
 
 if(is.null(person)){print("No person chosen to make maps for")}else{
@@ -88,18 +91,19 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
   ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
   inset <- raster::projectRaster(inset,  crs = 4326)
 
-  ## start making data for selected person
-  pers.dat <- dat %>% filter(PERSON %in% person)
-  tags.dat <- dat %>% filter(TAG_ID %in% pers.dat$TAG_ID)
+  # ## start making data for selected person
+  # pers.dat <- dat %>% filter(PERSON %in% person)
+  # tags.dat <- dat %>% filter(TAG_ID %in% pers.dat$TAG_ID)
+  #
+  # ## link paths to specific events
+  # path.pers <- paths %>% filter(TID %in% pers.dat$TAG_ID)
+  # path.pers$CID = as.numeric(path.pers$CID)
+  # path.pers$POS = as.numeric(path.pers$POS)
+  # path.pers <- path.pers %>% arrange(TID,CID,POS)
 
-  ## link paths to specific events
-  path.pers <- paths %>% filter(TID %in% pers.dat$TAG_ID)
-  path.pers$CID = as.numeric(path.pers$CID)
-  path.pers$POS = as.numeric(path.pers$POS)
-  path.pers <- path.pers %>% arrange(TID,CID,POS)
-  path.pers <- path.pers %>% group_by(TID,CID) %>% mutate(event = ifelse(POS==1,"release",
-                                                                         ifelse(POS==max(POS),
-                                                                                ,"pathing"))) %>% ungroup()
+  ### filter path data for tags recaptured by chosen person
+  path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
+
   #### Make sf objects
   sf_points <- sf::st_as_sf(path.pers, coords = c("LON","LAT"))
   sf::st_crs(sf_points) <- sf::st_crs(4326)  # EPSG code for WGS84
@@ -142,19 +146,19 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     ylen = maxy - miny
     stretch.y=F
     stretch.x=F
-    if(ylen-xlen>0.2){stretch.y=T
-    stretch.y.factor = ylen-xlen}
-    if(xlen-ylen>0.2){stretch.x=T}
+    # if(ylen-xlen>0.2){stretch.y=T
+    # stretch.y.factor = ylen-xlen}
+    # if(xlen-ylen>0.2){stretch.x=T}
 
 
     while(xlen < ylen){
-      maxx = maxx+.01
-      minx = minx-.01
+      maxx = maxx+.1
+      minx = minx-.1
       xlen =  maxx - minx
     }
     while(ylen < xlen){
-      maxy = maxy+.01
-      miny = miny-.01
+      maxy = maxy+.1
+      miny = miny-.1
       ylen =  maxy - miny
     }
 
@@ -170,16 +174,19 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
       ylen =  maxy - miny
     }
 
+
+    #Expand region (stretch a bit on one axis if that range is very large)
+    minx = minx - ylen/3
+    maxx = maxx + ylen/3
+
     ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/120
+    scale = (maxy-miny)/4
     maxx = maxx+scale
     minx = minx-scale
     maxy = maxy+scale
     miny = miny-scale
 
-    ##Expand region (stretch a bit on one axis if that range is very large)
-    minx = minx - ylen/3
-    maxx = maxx + ylen/3
+
 
     if(stretch.y){
       miny = miny - ylen/6
@@ -228,28 +235,46 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
 
 
     ## get labels
-    rel.lab <- pers.dat %>% filter(TAG_ID  %in% i) %>% summarise(TAG_ID = first(TAG_ID),DATE = first(REL_DATE), YEAR = first(REL_YEAR) ,LAT = first(REL_LAT), LON = first(REL_LON))
-    rel.lab <- rel.lab %>% mutate(name = paste("Tag:",TAG_ID,DATE))
+    rel.lab <- path.pers %>% filter(TID  %in% i) %>% summarise(TID = first(TID),DATE = first(REL_DATE),LAT = first(LAT), LON = first(LON))
+    rel.lab <- rel.lab %>% mutate(name = paste("Tag:",TID,DATE))
     rel.sf <- sf::st_as_sf(rel.lab, coords = c("LON","LAT"))
     sf::st_crs(rel.sf) <- sf::st_crs(4326)
 
-    rec.lab <- pers.dat %>% filter(TAG_ID  %in% i) %>% dplyr::select(TAG_ID,REC_DATE,REC_YEAR,REC_LAT,REC_LON) %>% mutate(name = paste("You Captured:",REC_DATE))
-    rec.sf <- sf::st_as_sf(rec.lab, coords = c("REC_LON","REC_LAT"))
+    rec.lab <- path.pers %>% filter(TID  %in% i, !REC_PERSON %in% "NA") %>% dplyr::select(TID,REC_DATE,LAT,LON,REC_PERSON)
+    rec.lab <- rec.lab %>% mutate(name = ifelse(REC_PERSON %in% person,paste("You Captured:",REC_DATE),paste("Other Fisher Captured:",REC_DATE)))
+    rec.sf <- sf::st_as_sf(rec.lab, coords = c("LON","LAT"))
     sf::st_crs(rec.sf) <- sf::st_crs(4326)
 
 
-    outplot <- gg_raster(base)+
-      geom_sf(data=path_sf, colour = "red", linewidth=1.8, arrow = arrow(type = "open", length = unit(0.1, "inches")))+
+    a <- gg_raster(base)+
+      ggtitle(paste(person,"-",i))+
+      geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
       geom_sf(data=rel.sf, colour = "yellow")+
       geom_sf(data=rec.sf, colour = "yellow")+
-      geom_sf_label_repel(data = rel.sf, aes(label=name, colour="blue"),show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
-      geom_sf_label_repel(data = rec.sf, aes(label=name, colour="blue"),show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
+      geom_sf_label_repel(data = rel.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
+      geom_sf_label_repel(data = rec.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)
 
-    ggsave(filename = paste0(person,i,".pdf"), path = "C:/Users/ELEMENTG/Documents/Rsaves", plot = outplot, width = 11, height = 10)
+
+    #### make inset with NS map
+    b <- gg_raster(inset)+
+      geom_sf(data = ext, colour = "red", alpha = 0.1)+
+      coord_sf(expand = F)+
+      theme(axis.title = element_blank(),
+            axis.text  = element_blank(),
+            axis.ticks = element_blank(),
+            plot.margin = unit(c(0.0,0.0,0.001,0.001),'lines'))
+
+    b1 <- ggplotGrob(b)
+
+      outplot <- a +
+      annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
+      ggsave(filename = paste0(person,i,".pdf"), path = "C:/Users/ELEMENTG/Documents/Rsaves", plot = outplot, width = 11, height = 10)
+
+
   }
 
-
+}
 
 }
 
