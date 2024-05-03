@@ -1,9 +1,9 @@
-library(dplyr)
-library(basemaps)
-library(svDialogs)
-library(sf)
-library(ggplot2)
-library(ggsflabel)
+# library(dplyr)
+# library(basemaps)
+# library(svDialogs)
+# library(sf)
+# library(ggplot2)
+# library(ggsflabel)
 #library(shiny)
 
 # library(rgeos)
@@ -45,35 +45,9 @@ sql = paste("SELECT * FROM ELEMENTG.LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
-# ##recaptures
-# query = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
-# recaptures <- ROracle::dbSendQuery(conn, query)
-# rec <- ROracle::fetch(recaptures)
-#
-# ##releases
-# cap.samps <- paste0("('",paste(rec$TAG_ID, collapse ="','"),"')")
-# query = paste("SELECT * FROM ELEMENTG.LBT_RELEASES WHERE TAG_ID in",cap.samps)
-# releases <- ROracle::dbSendQuery(conn, query)
-# rel <- ROracle::fetch(releases)
-
 ##
 ROracle::dbDisconnect(conn)
 
-# #### make table with all recaptures and their release information
-# ## Prepare recaptures
-# rec <- rec %>% mutate(lat = LAT_DD) %>% mutate(lon = LON_DD)
-# rec <- rec %>% mutate(trip = paste(lat,lon,REC_DATE))
-# rec <- rec %>% mutate(REC_DATE = as.Date(REC_DATE, format= "%d/%m/%Y"))
-# rec <- rec %>% mutate(REC_DATE = format(REC_DATE, "%d-%b-%Y"))
-# rec <- rec %>% dplyr::select(TAG_ID,REC_DATE,YEAR,LAT_DD,LON_DD,PERSON,trip)
-# rec <- rec %>% rename(REC_YEAR = YEAR, REC_LAT= LAT_DD,REC_LON = LON_DD)
-#
-# ## Prepare releases
-# rel <- rel %>% rename(REL_LAT = LAT_DD, REL_LON = LON_DD, REL_YEAR = YEAR)
-# rel <- rel %>% mutate(REL_DATE = as.Date(REL_DATE, format= "%d/%m/%Y"))
-# rel <- rel %>% mutate(REL_DATE = format(REL_DATE, "%d-%b-%Y"))
-#
-# dat <- left_join(rec,rel)
 
 
 if(is.null(person)){print("No person chosen to make maps for")}else{
@@ -91,15 +65,6 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
   ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
   inset <- raster::projectRaster(inset,  crs = 4326)
 
-  # ## start making data for selected person
-  # pers.dat <- dat %>% filter(PERSON %in% person)
-  # tags.dat <- dat %>% filter(TAG_ID %in% pers.dat$TAG_ID)
-  #
-  # ## link paths to specific events
-  # path.pers <- paths %>% filter(TID %in% pers.dat$TAG_ID)
-  # path.pers$CID = as.numeric(path.pers$CID)
-  # path.pers$POS = as.numeric(path.pers$POS)
-  # path.pers <- path.pers %>% arrange(TID,CID,POS)
 
   ### filter path data for tags recaptured by chosen person
   path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
@@ -121,7 +86,9 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     path_list[[j]] <- line_list
   }
 
-  ##loop through each tag in path_list to generate maps for each
+
+
+  ####loop through each tag in path_list to generate maps for each ##################################################
   for (i in names(path_list)){
 
     ## subset path list for current tag
@@ -134,31 +101,24 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     ### set plotting region by tag
     path.tag <- path.pers %>% filter(TID %in% i)
 
-    ##Make plotting region visually more square
+    ##Make plotting region more square
     path.tag$LAT = as.numeric(path.tag$LAT)
     path.tag$LON = as.numeric(path.tag$LON)
     maxx =max(path.tag$LON)
     maxy = max(path.tag$LAT)
     minx = min(path.tag$LON)
     miny = min(path.tag$LAT)
-
     xlen = maxx - minx
     ylen = maxy - miny
-    stretch.y=F
-    stretch.x=F
-    # if(ylen-xlen>0.2){stretch.y=T
-    # stretch.y.factor = ylen-xlen}
-    # if(xlen-ylen>0.2){stretch.x=T}
-
 
     while(xlen < ylen){
-      maxx = maxx+.1
-      minx = minx-.1
+      maxx = maxx+.01
+      minx = minx-.01
       xlen =  maxx - minx
     }
     while(ylen < xlen){
-      maxy = maxy+.1
-      miny = miny-.1
+      maxy = maxy+.01
+      miny = miny-.01
       ylen =  maxy - miny
     }
 
@@ -175,35 +135,16 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     }
 
 
-    #Expand region (stretch a bit on one axis if that range is very large)
+    #stretch on x axis for visual squareness
     minx = minx - ylen/3
     maxx = maxx + ylen/3
 
     ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/4
+    scale = (maxy-miny)/3
     maxx = maxx+scale
     minx = minx-scale
     maxy = maxy+scale
     miny = miny-scale
-
-
-
-    if(stretch.y){
-      miny = miny - ylen/6
-      maxy = maxy + ylen/6
-    }
-    if(stretch.x){
-      minx = minx - ylen/6
-      maxx = maxx + ylen/6
-    }
-
-    ylen = maxy-miny
-    xlen = maxx-minx
-
-    left <- minx
-    right <- maxx
-    top <- maxy
-    bottom <- miny
 
     ## If just one point, set box size
     if(maxx == minx & maxy == miny){
@@ -231,29 +172,40 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
 
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
     base <- raster::projectRaster(base,  crs = 4326)
-    limits <- sf::st_bbox(base)
 
+    ## get dimensions information of base and inset for graph placement
+    limits <- sf::st_bbox(base)
+    ylen = as.numeric(limits$ymax-limits$ymin)
+    xlen = as.numeric(limits$xmax-limits$xmin)
+    left <- as.numeric(limits$xmin)
+    right <- as.numeric(limits$xmax)
+    top <- as.numeric(limits$ymax)
+    bottom <- as.numeric(limits$ymin)
+
+    inset.lim <- sf::st_bbox(inset)
+    inset.ylen = as.numeric(inset.lim$ymax-inset.lim$ymin)
+    inset.xlen = as.numeric(inset.lim$xmax-inset.lim$xmin)
+    inset.ratio = inset.xlen/inset.ylen
 
     ## get labels
     rel.lab <- path.pers %>% filter(TID  %in% i) %>% summarise(TID = first(TID),DATE = first(REL_DATE),LAT = first(LAT), LON = first(LON))
     rel.lab <- rel.lab %>% mutate(name = paste("Tag:",TID,DATE))
-    rel.sf <- sf::st_as_sf(rel.lab, coords = c("LON","LAT"))
-    sf::st_crs(rel.sf) <- sf::st_crs(4326)
-
     rec.lab <- path.pers %>% filter(TID  %in% i, !REC_PERSON %in% "NA") %>% dplyr::select(TID,REC_DATE,LAT,LON,REC_PERSON)
     rec.lab <- rec.lab %>% mutate(name = ifelse(REC_PERSON %in% person,paste("You Captured:",REC_DATE),paste("Other Fisher Captured:",REC_DATE)))
-    rec.sf <- sf::st_as_sf(rec.lab, coords = c("LON","LAT"))
-    sf::st_crs(rec.sf) <- sf::st_crs(4326)
+
+    map.labs <- rbind(rel.lab %>% select(TID,LAT,LON,name),rec.lab %>% select(TID,LAT,LON,name))
+
+    labs.sf <- sf::st_as_sf(map.labs, coords = c("LON","LAT"))
+    sf::st_crs(labs.sf) <- sf::st_crs(4326)
 
 
     a <- gg_raster(base)+
       ggtitle(paste(person,"-",i))+
       geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
-      geom_sf(data=rel.sf, colour = "yellow")+
-      geom_sf(data=rec.sf, colour = "yellow")+
-      geom_sf_label_repel(data = rel.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
-      geom_sf_label_repel(data = rec.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
-      coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)
+      geom_sf(data=labs.sf, colour = "yellow")+
+      geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
+      coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+      theme(plot.margin = margin(t = 50))
 
 
     #### make inset with NS map
@@ -263,12 +215,21 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
       theme(axis.title = element_blank(),
             axis.text  = element_blank(),
             axis.ticks = element_blank(),
-            plot.margin = unit(c(0.0,0.0,0.001,0.001),'lines'))
+            plot.margin = unit(c(0.2,0.1,0.0,0.0),'lines'))
 
     b1 <- ggplotGrob(b)
 
+    ##set positioning of inset while maintaining its ratios
+    inset.top = top+ylen/7
+    inset.bottom = inset.top-ylen/3
+    inset.height = inset.top-inset.bottom
+    inset.right = right+xlen/10
+    inset.width = inset.height*inset.ratio
+
       outplot <- a +
-      annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
+        annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
+        #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
+      # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
       ggsave(filename = paste0(person,i,".pdf"), path = "C:/Users/ELEMENTG/Documents/Rsaves", plot = outplot, width = 11, height = 10)
 
 
@@ -277,4 +238,6 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
 }
 
 }
+
+
 
