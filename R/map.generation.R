@@ -1,30 +1,25 @@
-# library(dplyr)
-# library(basemaps)
-# library(svDialogs)
-# library(sf)
-# library(ggplot2)
-# library(ggsflabel)
-#library(shiny)
-
-# library(rgeos)
-# library(sp)
-# library(spatstat)
-# library(shadowtext)
-# library(ggplot2)
-# library(ggmap)
-# library(ggthemes)
-# library(ggrepel)
-# library(geosphere)
-# library(RStoolbox)
-# library(raster)
-#
 
 #' @title generate_maps
 #' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle DBI
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",person=NULL){
+generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
+                          person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE){
+
+
+  #### load large base map for inset
+  ## Allow user to choose data file to upload or manually draw extent
+  result <- dlgMessage(type = "yesno", message = "Would you like to mannually draw the mapping area? If No, the default basemap will be used")
+  if(result$res %in% "yes"){ext <- draw_ext()}else{ext <- readRDS("C:/bio/LobTag2/app.files/NS_extent")}
+
+  set_defaults(ext, map_service = "mapbox",map_type = "satellite",
+               map_token = map_token)
+
+  inset <- basemap_raster(ext) #### forces basemap crs to be in 3857
+
+  ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
+  inset <- raster::projectRaster(inset,  crs = 4326)
 
 
 
@@ -45,26 +40,26 @@ sql = paste("SELECT * FROM ELEMENTG.LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
+## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
+paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
+
+people = person
+if(all.people){
+  ## get all names who've recaptured tags
+  sql = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
+  rec <- ROracle::dbSendQuery(conn, sql)
+  rec <- ROracle::fetch(rec)
+  people <- unique(rec$PERSON)
+}
+
 ##
 ROracle::dbDisconnect(conn)
 
-
+## loops if there's more than one person
+for (p in people){
+  person = p
 
 if(is.null(person)){print("No person chosen to make maps for")}else{
-
-  #### load large base map for inset
-  ## Allow user to choose data file to upload or manually draw extent
-  result <- dlgMessage(type = "yesno", message = "Would you like to mannually draw the mapping area? If No, the default basemap will be used")
-  if(result$res %in% "yes"){ext <- draw_ext()}else{ext <- readRDS("C:/bio/LobTag2/app.files/NS_extent")}
-
-  set_defaults(ext, map_service = "mapbox",map_type = "satellite",
-               map_token = map_token)
-
-  inset <- basemap_raster(ext) #### forces basemap crs to be in 3857
-
-  ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
-  inset <- raster::projectRaster(inset,  crs = 4326)
-
 
   ### filter path data for tags recaptured by chosen person
   path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
@@ -193,7 +188,7 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     rec.lab <- path.pers %>% filter(TID  %in% i, !REC_PERSON %in% "NA") %>% dplyr::select(TID,REC_DATE,LAT,LON,REC_PERSON)
     rec.lab <- rec.lab %>% mutate(name = ifelse(REC_PERSON %in% person,paste("You Captured:",REC_DATE),paste("Other Fisher Captured:",REC_DATE)))
 
-    map.labs <- rbind(rel.lab %>% select(TID,LAT,LON,name),rec.lab %>% select(TID,LAT,LON,name))
+    map.labs <- rbind(rel.lab %>% dplyr::select(TID,LAT,LON,name),rec.lab %>% dplyr::select(TID,LAT,LON,name))
 
     labs.sf <- sf::st_as_sf(map.labs, coords = c("LON","LAT"))
     sf::st_crs(labs.sf) <- sf::st_crs(4326)
@@ -205,7 +200,7 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
       geom_sf(data=labs.sf, colour = "yellow")+
       geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-      theme(plot.margin = margin(t = 50))
+      theme(plot.margin = margin(t = 73))
 
 
     #### make inset with NS map
@@ -220,7 +215,7 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     b1 <- ggplotGrob(b)
 
     ##set positioning of inset while maintaining its ratios
-    inset.top = top+ylen/7
+    inset.top = top+ylen/5
     inset.bottom = inset.top-ylen/3
     inset.height = inset.top-inset.bottom
     inset.right = right+xlen/10
@@ -230,11 +225,12 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
         annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
         #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
       # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
-      ggsave(filename = paste0(person,i,".pdf"), path = "C:/Users/ELEMENTG/Documents/Rsaves", plot = outplot, width = 11, height = 10)
+      ggsave(filename = paste0(person,i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
 
 
   }
 
+}
 }
 
 }
