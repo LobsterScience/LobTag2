@@ -3,7 +3,7 @@
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(){
+upload_releases <- function(user = "ELEMENTG"){
 
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose a csv file containing your releases data")
@@ -159,7 +159,7 @@ if(return_error){
 if(!return_error){
   ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
-  table_name <- "ELEMENTG.LBT_RELEASES"
+  table_name <- paste0(user,".LBT_RELEASES")
   ### open ORACLE connection
   tryCatch({
     drv <- DBI::dbDriver("Oracle")

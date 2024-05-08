@@ -3,7 +3,7 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tagging/depthraster2.tif",neighborhood = 16,type = "least.cost"){
+generate_paths <- function(user="ELEMENTG", depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16,type = "least.cost"){
 
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
@@ -16,12 +16,12 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
 
 
   ## make table with all recaptures and their release information
-  query = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
+  query = paste0("SELECT * FROM ",user,".LBT_RECAPTURES")
   recaptures <- ROracle::dbSendQuery(conn, query)
   recaptures <- ROracle::fetch(recaptures)
 
   cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
-  query = paste("SELECT * FROM ELEMENTG.LBT_RELEASES WHERE TAG_ID in",cap.samps)
+  query = paste0("SELECT * FROM ",user,".LBT_RELEASES WHERE TAG_ID in ",cap.samps)
   releases <- ROracle::dbSendQuery(conn, query)
   releases <- ROracle::fetch(releases)
 
@@ -47,7 +47,7 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
   }
 
   ## find tags that have not yet been pathed
-  dat <- ROracle::dbSendQuery(conn, "SELECT * FROM ELEMENTG.LBT_PATH")
+  dat <- ROracle::dbSendQuery(conn, paste0("SELECT * FROM ",user,".LBT_PATH"))
   dat <-  ROracle::fetch(dat)
   ROracle::dbDisconnect(conn)
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
@@ -141,8 +141,8 @@ generate_paths <- function(depth.raster.path = "C:/bio.data/bio.lobster/data/tag
     drv <- DBI::dbDriver("Oracle")
     con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
 
-      pathdb = paste("ELEMENTG",".","LBT_PATH", sep = "")
-      pathsdb = paste("ELEMENTG",".","LBT_PATHS", sep = "")
+      pathdb = paste(user,".","LBT_PATH", sep = "")
+      pathsdb = paste(user,".","LBT_PATHS", sep = "")
 
       path_call = create_sql_query(pathdb, df2towrite)
       paths_call = create_sql_query(pathsdb, dxtowrite)

@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
+generate_maps <- function(user="ELEMENTG", map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
                           person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE){
 
 
@@ -33,10 +33,10 @@ generate_maps <- function(map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZm
   })
 
 ## bring in paths
-sql = paste("SELECT * FROM ELEMENTG.LBT_PATH")
+sql = paste0("SELECT * FROM ",user,".LBT_PATH")
 path <- ROracle::dbSendQuery(conn, sql)
 path <- ROracle::fetch(path)
-sql = paste("SELECT * FROM ELEMENTG.LBT_PATHS")
+sql = paste0("SELECT * FROM ",user,".LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
@@ -46,7 +46,7 @@ paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
 people = person
 if(all.people){
   ## get all names who've recaptured tags
-  sql = paste("SELECT * FROM ELEMENTG.LBT_RECAPTURES")
+  sql = paste0("SELECT * FROM ",user,".LBT_RECAPTURES")
   rec <- ROracle::dbSendQuery(conn, sql)
   rec <- ROracle::fetch(rec)
   people <- unique(rec$PERSON)
