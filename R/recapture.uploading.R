@@ -3,8 +3,92 @@
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
-upload_recaptures <- function(user = "ELEMENTG"){
+upload_recaptures <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
 
+  oracle.personal.user<<-username
+  oracle.personal.password<<-password
+  oracle.personal.server<<-dbname
+
+  ## Check if recaptures and people tables already exist
+
+  tryCatch({
+    drv <- DBI::dbDriver("Oracle")
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  }, warning = function(w) {
+  }, error = function(e) {
+    return(toJSON("Connection failed"))
+  }, finally = {
+  })
+
+  table_name <- "LBT_RECAPTURES"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+  # If the table does not exist, create it
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    TAG_PREFIX VARCHAR2(50),
+    TAG_NUMBER VARCHAR2(50),
+    TAG_ID VARCHAR2(50),
+    REC_DATE VARCHAR2(50),
+    PERSON VARCHAR2(100),
+    PERSON_2 VARCHAR2(100),
+    LAT_DEGREE VARCHAR2(50),
+    LAT_MINUTE VARCHAR2(50),
+    LON_DEGREE VARCHAR2(50),
+    LON_MINUTE VARCHAR2(50),
+    LAT_DD VARCHAR2(50),
+    LON_DD VARCHAR2(50),
+    FATHOMS VARCHAR2(50),
+    RELCODE VARCHAR2(50),
+    CAPTAIN VARCHAR2(100),
+    VESSEL VARCHAR2(100),
+    YEAR VARCHAR2(50),
+    MANAGEMENT_AREA VARCHAR2(100),
+    CAPTURE_LENGTH VARCHAR2(50),
+    SEX VARCHAR2(10),
+    EGG_STATE VARCHAR2(50),
+    REWARDED VARCHAR2(10),
+    COMMENTS VARCHAR2(1000)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+}
+
+    table_name <- "LBT_PEOPLE"
+    query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+    result <- dbGetQuery(con, query)
+    # If the table does not exist, create it
+    if (result[[1]] == 0) {
+      print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    NAME VARCHAR2(100),
+    CIVIC VARCHAR2(50),
+    TOWN VARCHAR2(100),
+    PROV VARCHAR2(50),
+    COUNTRY VARCHAR2(100),
+    POST VARCHAR2(20),
+    EMAIL VARCHAR2(100),
+    PHO1 VARCHAR2(20),
+    PHO2 VARCHAR2(20),
+    AFFILIATION VARCHAR2(100),
+    LICENSE_AREA VARCHAR2(100)
+)")
+
+      # Execute the SQL statement
+      dbSendQuery(con, sql_statement)
+
+  }
+    # Close the connection
+    dbDisconnect(con)
+
+####################################################################################################
 
   # Define UI for application
   ui <- fluidPage(
@@ -163,7 +247,7 @@ upload_recaptures <- function(user = "ELEMENTG"){
     # Observer to check if Tag Prefix and Tag Number combination exists in the Oracle table
     observeEvent(c(input$tag_prefix, input$tag_number), {
       if (nchar(input$tag_prefix) > 0 & is.numeric(input$tag_number)) {
-        query <- paste("SELECT * FROM ",user,".LBT_RELEASES WHERE TAG_PREFIX = '", input$tag_prefix, "' AND TAG_NUM = ", input$tag_number, sep = "")
+        query <- paste("SELECT * FROM ",username,".LBT_RELEASES WHERE TAG_PREFIX = '", input$tag_prefix, "' AND TAG_NUM = ", input$tag_number, sep = "")
         result <- dbGetQuery(con, query)
         if (nrow(result) == 0) {
           # Update style and display warning message if combination not found
@@ -186,7 +270,7 @@ upload_recaptures <- function(user = "ELEMENTG"){
     # Real-time data retrieval based on "Person" field input
     observeEvent(input$person, {
       if (nchar(input$person) > 0) {
-        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM ",user,".LBT_PEOPLE WHERE NAME = '", input$person, "'", sep = "")
+        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM ",username,".LBT_PEOPLE WHERE NAME = '", input$person, "'", sep = "")
         result <- dbGetQuery(con, query)
         if (nrow(result) > 0) {
           updateTextInput(session, "street_address", value = result$CIVIC)
@@ -239,7 +323,10 @@ upload_recaptures <- function(user = "ELEMENTG"){
       longitude_ddmm_mm <- paste(long_deg, long_dec_min, sep = "")
 
       # Calculate longitude decimal degree value
-      longitude_dddd <- as.numeric(long_deg) + (as.numeric(long_dec_min) / 60)
+      if(as.numeric(long_deg)<0){
+        longitude_dddd <- as.numeric(long_deg) - (as.numeric(long_dec_min) / 60)
+      }else{longitude_dddd <- as.numeric(long_deg) + (as.numeric(long_dec_min) / 60)}
+
 
 
       # Check if selected and numeric (non-mandatory) fields are empty and handle by making null
@@ -255,7 +342,7 @@ upload_recaptures <- function(user = "ELEMENTG"){
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
       # Prepare SQL insert statement
-      sql_1 <- paste("INSERT INTO ",user,".LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
+      sql_1 <- paste("INSERT INTO ",username,".LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
 
       # Execute SQL insert statement
       dbExecute(con, sql_1)
@@ -263,7 +350,7 @@ upload_recaptures <- function(user = "ELEMENTG"){
       # Prepare SQL update/insert statement for the LBT_PEOPLE table and insert data
       if (nchar(input$person) > 0){
         sql_2 <- paste("
-      MERGE INTO ",user,".LBT_PEOPLE tgt
+      MERGE INTO ",username,".LBT_PEOPLE tgt
       USING (SELECT '", input$person, "' AS name FROM dual) src
       ON (tgt.NAME = src.name)
       WHEN MATCHED THEN
@@ -345,7 +432,93 @@ upload_recaptures <- function(user = "ELEMENTG"){
 #' @import dplyr ROracle DBI shiny DT svDialogs
 #' @description batch uploads tag recaptures data
 #' @export
-batch_upload_recaptures <- function(){
+batch_upload_recaptures <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
+
+  oracle.personal.user<<-username
+  oracle.personal.password<<-password
+  oracle.personal.server<<-dbname
+
+  ## Check if recaptures and people tables already exist
+
+  tryCatch({
+    drv <- DBI::dbDriver("Oracle")
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  }, warning = function(w) {
+  }, error = function(e) {
+    return(toJSON("Connection failed"))
+  }, finally = {
+  })
+
+  table_name <- "LBT_RECAPTURES"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+  # If the table does not exist, create it
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    TAG_PREFIX VARCHAR2(50),
+    TAG_NUMBER VARCHAR2(50),
+    TAG_ID VARCHAR2(50),
+    REC_DATE VARCHAR2(50),
+    PERSON VARCHAR2(100),
+    PERSON_2 VARCHAR2(100),
+    LAT_DEGREE VARCHAR2(50),
+    LAT_MINUTE VARCHAR2(50),
+    LON_DEGREE VARCHAR2(50),
+    LON_MINUTE VARCHAR2(50),
+    LAT_DD VARCHAR2(50),
+    LON_DD VARCHAR2(50),
+    FATHOMS VARCHAR2(50),
+    RELCODE VARCHAR2(50),
+    CAPTAIN VARCHAR2(100),
+    VESSEL VARCHAR2(100),
+    YEAR VARCHAR2(50),
+    MANAGEMENT_AREA VARCHAR2(100),
+    CAPTURE_LENGTH VARCHAR2(50),
+    SEX VARCHAR2(10),
+    EGG_STATE VARCHAR2(50),
+    REWARDED VARCHAR2(10),
+    COMMENTS VARCHAR2(1000)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+  }
+
+  table_name <- "LBT_PEOPLE"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+  # If the table does not exist, create it
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    NAME VARCHAR2(100),
+    CIVIC VARCHAR2(50),
+    TOWN VARCHAR2(100),
+    PROV VARCHAR2(50),
+    COUNTRY VARCHAR2(100),
+    POST VARCHAR2(20),
+    EMAIL VARCHAR2(100),
+    PHO1 VARCHAR2(20),
+    PHO2 VARCHAR2(20),
+    AFFILIATION VARCHAR2(100),
+    LICENSE_AREA VARCHAR2(100)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+  }
+  # Close the connection
+  dbDisconnect(con)
+
+####################################################################################################################
+
   ## Allow user to choose data file to upload
   dlg_message("In the following window, choose a csv file containing your recaptures data")
   file_path <- dlg_open(filter = dlg_filters["csv",])$res
@@ -489,8 +662,8 @@ batch_upload_recaptures <- function(){
   if(!return_error){
     ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
-    table_name <- paste0(user,".LBT_RECAPTURES")
-    people.tab.name <- paste0(user,".LBT_PEOPLE")
+    table_name <- paste0(username,".LBT_RECAPTURES")
+    people.tab.name <- paste0(username,".LBT_PEOPLE")
     ### open ORACLE connection
     tryCatch({
       drv <- DBI::dbDriver("Oracle")

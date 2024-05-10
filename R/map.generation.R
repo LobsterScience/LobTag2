@@ -5,7 +5,8 @@
 #' @export
 
 generate_maps <- function(user="ELEMENTG", map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
-                          person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE){
+                          person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE,
+                          username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
 
 
   #### load large base map for inset

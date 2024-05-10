@@ -3,7 +3,76 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(user="ELEMENTG", depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16,type = "least.cost"){
+generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16, type = "least.cost"){
+
+  oracle.personal.user<<-username
+  oracle.personal.password<<-password
+  oracle.personal.server<<-dbname
+
+  ## Check if path tables already exist and create them if they don't
+
+  tryCatch({
+    drv <- DBI::dbDriver("Oracle")
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  }, warning = function(w) {
+  }, error = function(e) {
+    return(toJSON("Connection failed"))
+  }, finally = {
+  })
+
+  table_name <- "LBT_PATH"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    TID VARCHAR2(50),
+    CID VARCHAR2(50),
+    CDATE VARCHAR2(50),
+    DIST VARCHAR2(50),
+    TAG_NUM VARCHAR2(50),
+    TAG_PREFIX VARCHAR2(50)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+  }
+
+  table_name <- "LBT_PATHS"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    TID VARCHAR2(50),
+    CID VARCHAR2(50),
+    POS VARCHAR2(50),
+    LON VARCHAR2(50),
+    LAT VARCHAR2(50),
+    TAG_NUM VARCHAR2(50),
+    TAG_PREFIX VARCHAR2(50),
+    REL_DATE VARCHAR2(50),
+    REC_DATE VARCHAR2(50),
+    REC_PERSON VARCHAR2(100)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+  }
+
+  # Close the connection
+  dbDisconnect(con)
+#################################################################################################################################################
+
+  ## make table with all recaptures and their release information
 
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
@@ -14,14 +83,12 @@ generate_paths <- function(user="ELEMENTG", depth.raster.path = "C:/bio/LobTag2/
   }, finally = {
   })
 
-
-  ## make table with all recaptures and their release information
-  query = paste0("SELECT * FROM ",user,".LBT_RECAPTURES")
+  query = paste0("SELECT * FROM ",username,".LBT_RECAPTURES")
   recaptures <- ROracle::dbSendQuery(conn, query)
   recaptures <- ROracle::fetch(recaptures)
 
   cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
-  query = paste0("SELECT * FROM ",user,".LBT_RELEASES WHERE TAG_ID in ",cap.samps)
+  query = paste0("SELECT * FROM ",username,".LBT_RELEASES WHERE TAG_ID in ",cap.samps)
   releases <- ROracle::dbSendQuery(conn, query)
   releases <- ROracle::fetch(releases)
 
@@ -47,7 +114,7 @@ generate_paths <- function(user="ELEMENTG", depth.raster.path = "C:/bio/LobTag2/
   }
 
   ## find tags that have not yet been pathed
-  dat <- ROracle::dbSendQuery(conn, paste0("SELECT * FROM ",user,".LBT_PATH"))
+  dat <- ROracle::dbSendQuery(conn, paste0("SELECT * FROM ",username,".LBT_PATH"))
   dat <-  ROracle::fetch(dat)
   ROracle::dbDisconnect(conn)
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
@@ -141,8 +208,8 @@ generate_paths <- function(user="ELEMENTG", depth.raster.path = "C:/bio/LobTag2/
     drv <- DBI::dbDriver("Oracle")
     con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
 
-      pathdb = paste(user,".","LBT_PATH", sep = "")
-      pathsdb = paste(user,".","LBT_PATHS", sep = "")
+      pathdb = paste(username,".","LBT_PATH", sep = "")
+      pathsdb = paste(username,".","LBT_PATHS", sep = "")
 
       path_call = create_sql_query(pathdb, df2towrite)
       paths_call = create_sql_query(pathsdb, dxtowrite)

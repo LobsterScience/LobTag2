@@ -3,7 +3,73 @@
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(user = "ELEMENTG"){
+upload_releases <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
+
+  oracle.personal.user<<-username
+  oracle.personal.password<<-password
+  oracle.personal.server<<-dbname
+
+  # Check if releases table already exists
+
+  tryCatch({
+    drv <- DBI::dbDriver("Oracle")
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  }, warning = function(w) {
+  }, error = function(e) {
+    return(toJSON("Connection failed"))
+  }, finally = {
+  })
+
+
+  table_name <- "LBT_RELEASES"
+  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  result <- dbGetQuery(con, query)
+
+  # If the table does not exist, create it
+  if (result[[1]] == 0) {
+    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    # Define the SQL statement to create the table
+    sql_statement <- paste0("
+    CREATE TABLE ",table_name," (
+    SAMPLER VARCHAR2(100),
+    SAMPLER_2 VARCHAR2(100),
+    AFFILIATION VARCHAR2(100),
+    VESSEL VARCHAR2(100),
+    CAPTAIN VARCHAR2(100),
+    PORT VARCHAR2(100),
+    LFA VARCHAR2(50),
+    DAY VARCHAR2(50),
+    MONTH VARCHAR2(50),
+    YEAR VARCHAR2(50),
+    TAG_COLOR VARCHAR2(50),
+    TAG_PREFIX VARCHAR2(50),
+    TAG_NUM VARCHAR2(50),
+    TAG_ID VARCHAR2(50),
+    CARAPACE_LENGTH VARCHAR2(50),
+    SEX VARCHAR2(10),
+    SHELL VARCHAR2(10),
+    CLAW VARCHAR2(10),
+    LAT_DEGREES VARCHAR2(50),
+    LAT_MINUTES VARCHAR2(50),
+    LON_DEGREES VARCHAR2(50),
+    LON_MINUTES VARCHAR2(50),
+    LATDDMM_MM VARCHAR2(20),
+    LONDDMM_MM VARCHAR2(20),
+    LAT_DD VARCHAR2(50),
+    LON_DD VARCHAR2(50),
+    REL_DATE VARCHAR2(50),
+    COMMENTS VARCHAR2(1000)
+)")
+
+    # Execute the SQL statement
+    dbSendQuery(con, sql_statement)
+
+    # Close the connection
+    dbDisconnect(con)
+
+  }
+
+####################################################################################################
 
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose a csv file containing your releases data")
@@ -27,6 +93,7 @@ for(i in 1:nrow(releases)){
 
 ##date column isn't 100% necessary but it's a good indication if things are going wrong
 releases$REL_DATE = paste(releases$DAY, releases$MONTH, releases$YEAR, sep = "/")
+releases$REL_DATE = format(as.Date(releases$REL_DATE, format = "%d/%m/%Y"), "%d/%m/%Y")
 releases$TAG_ID = paste0(releases$TAG_PREFIX,releases$TAG_NUM)
 
 ## retrieve only selected variables if there are extra / differently ordered columns
@@ -159,7 +226,7 @@ if(return_error){
 if(!return_error){
   ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
-  table_name <- paste0(user,".LBT_RELEASES")
+  table_name <- paste0(username,".LBT_RELEASES")
   ### open ORACLE connection
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
