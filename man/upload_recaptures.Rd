@@ -4,7 +4,11 @@
 \alias{upload_recaptures}
 \title{upload_recaptures}
 \usage{
-upload_recaptures()
+upload_recaptures(
+  username = oracle.personal.user,
+  password = oracle.personal.password,
+  dbname = oracle.personal.server
+)
 }
 \description{
 allows individual or batch uploading of recapture data

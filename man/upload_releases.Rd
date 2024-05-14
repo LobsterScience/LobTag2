@@ -4,7 +4,11 @@
 \alias{upload_releases}
 \title{upload_releases}
 \usage{
-upload_releases()
+upload_releases(
+  username = oracle.personal.user,
+  password = oracle.personal.password,
+  dbname = oracle.personal.server
+)
 }
 \description{
 batch uploads tag release data

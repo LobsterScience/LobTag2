@@ -4,7 +4,11 @@
 \alias{batch_upload_recaptures}
 \title{batch_upload_recaptures}
 \usage{
-batch_upload_recaptures()
+batch_upload_recaptures(
+  username = oracle.personal.user,
+  password = oracle.personal.password,
+  dbname = oracle.personal.server
+)
 }
 \description{
 batch uploads tag recaptures data

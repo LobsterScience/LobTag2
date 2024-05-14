@@ -5,7 +5,11 @@
 \title{generate_paths}
 \usage{
 generate_paths(
-  depth.raster.path = "C:/bio.data/bio.lobster/data/tagging/depthraster2.tif",
+  username = oracle.personal.user,
+  password = oracle.personal.password,
+  dbname = oracle.personal.server,
+  tags = "all",
+  depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif",
   neighborhood = 16,
   type = "least.cost"
 )

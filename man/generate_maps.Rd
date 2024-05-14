@@ -5,10 +5,15 @@
 \title{generate_maps}
 \usage{
 generate_maps(
+  user = "ELEMENTG",
   map_token =
     "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
   person = NULL,
-  output.location = "C:/Users/ELEMENTG/Documents/Rsaves"
+  output.location = "C:/Users/ELEMENTG/Documents/Rsaves",
+  all.people = FALSE,
+  username = oracle.personal.user,
+  password = oracle.personal.password,
+  dbname = oracle.personal.server
 )
 }
 \description{

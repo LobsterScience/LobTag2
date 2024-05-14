@@ -32,19 +32,33 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
     # Convert date to Oracle date format
     date_caught_oracle <- format(as.Date(date_caught, "%Y-%m-%d"), "%d/%m/%Y")
 
+    ## delete recapture
     query1 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle, "'")
-    query2 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_PATH WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND CDATE = '", date_caught, "'")
 
-    ##for paths, need to check which recapture it is in sequence and update CID values after delete
-    q <- paste0("SELECT CID FROM ",oracle.personal.user,".LBT_PATHS WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle,"' AND REC_PERSON = '",person,"'")
+    ## delete all single paths for tag
+    query2 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_PATH WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
 
+    ## delete all paths for tag
+    query3 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_PATHS WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
 
     # Execute the delete querys
     success <- tryCatch({
       dbExecute(con, query1)
       dbExecute(con, query2)
+      dbExecute(con, query3)
       dbCommit(con)
+
+      ## check if other recaptures still exist for this tag (re-pathing necessary)
+      q.check <- paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
+      check <- ROracle::dbSendQuery(con, q.check)
+      check <- ROracle::fetch(check)
+
       dbDisconnect(con)
+      ## regenerate paths for deleted tag if other recaptures exist
+      if(nrow(check)>0){
+        print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
+        generate_paths(tags = paste0(tag_prefix,tag_number))
+      }
       return(TRUE)  # Deletion successful
     }, error = function(e) {
       print(paste("Error in delete_recapture:", e$message))

@@ -3,7 +3,7 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16, type = "least.cost"){
+generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, tags = "all", depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16, type = "least.cost"){
 
   oracle.personal.user<<-username
   oracle.personal.password<<-password
@@ -117,6 +117,12 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
   dat <- ROracle::dbSendQuery(conn, paste0("SELECT * FROM ",username,".LBT_PATH"))
   dat <-  ROracle::fetch(dat)
   ROracle::dbDisconnect(conn)
+
+  ## for selected tag:
+  if(!(tags %in% "all")){
+    pdat <- pdat %>% filter(TAG_ID %in% tags)
+  }
+  ## Don't re-generate paths that already exist
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
   if(length(pathed)>0){x = pdat[-pathed,]}else{x=pdat}
 
