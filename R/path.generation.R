@@ -76,7 +76,7 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
 
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
-    conn <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
   }, warning = function(w) {
   }, error = function(e) {
     return(toJSON("Connection failed"))
@@ -84,12 +84,12 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
   })
 
   query = paste0("SELECT * FROM ",username,".LBT_RECAPTURES")
-  recaptures <- ROracle::dbSendQuery(conn, query)
+  recaptures <- ROracle::dbSendQuery(con, query)
   recaptures <- ROracle::fetch(recaptures)
 
   cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
   query = paste0("SELECT * FROM ",username,".LBT_RELEASES WHERE TAG_ID in ",cap.samps)
-  releases <- ROracle::dbSendQuery(conn, query)
+  releases <- ROracle::dbSendQuery(con, query)
   releases <- ROracle::fetch(releases)
 
   rel.prep <- releases %>% dplyr::select(TAG_ID, LAT_DD,LON_DD, REL_DATE,TAG_NUM,TAG_PREFIX) %>% rename(rel_lat = LAT_DD, rel_lon = LON_DD)
@@ -97,30 +97,15 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
   rec.prep$REC_DATE = as.Date(rec.prep$REC_DATE, format= "%d/%m/%Y")
   pdat <- left_join(rec.prep,rel.prep)
 
-  ## prepare depth raster
-  trans = NULL
-  r = raster(depth.raster.path)
-  mr = as.matrix(r)
-  mr[which(mr > -5000 & mr < 0)] = -1                       #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
-  mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
-  r = setValues(r, mr)
-
-  tr <- transition(r, mean, neighborhood)
-  if(type  == "random.walk"){
-    trans = geoCorrection(tr, type = "r", scl=FALSE)
-  }
-  if(type  == "least.cost"){
-    trans = geoCorrection(tr, type = "c", scl=FALSE)
-  }
-
   ## find tags that have not yet been pathed
-  dat <- ROracle::dbSendQuery(conn, paste0("SELECT * FROM ",username,".LBT_PATH"))
+  dat <- ROracle::dbSendQuery(con, paste0("SELECT * FROM ",username,".LBT_PATH"))
   dat <-  ROracle::fetch(dat)
-  ROracle::dbDisconnect(conn)
+  ROracle::dbDisconnect(con)
 
   ## for selected tag:
   if(!(tags %in% "all")){
     pdat <- pdat %>% filter(TAG_ID %in% tags)
+    if(nrow(pdat)==0){stop("Tag ID not found!")}
   }
   ## Don't re-generate paths that already exist
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
@@ -136,6 +121,24 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
   count = 1
   previd = ""
   if(nrow(x) == 0){base::message("No new paths to create!")}else{
+
+    ################################################ prepare depth raster
+    trans = NULL
+    r = raster(depth.raster.path)
+    mr = as.matrix(r)
+    mr[which(mr > -5000 & mr < 0)] = -1                       #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
+    mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
+    r = setValues(r, mr)
+
+    tr <- transition(r, mean, neighborhood)
+    if(type  == "random.walk"){
+      trans = geoCorrection(tr, type = "r", scl=FALSE)
+    }
+    if(type  == "least.cost"){
+      trans = geoCorrection(tr, type = "c", scl=FALSE)
+    }
+    ###############################################
+
     x <- x %>% arrange(PID,REC_DATE)
     dat <- arrange(dat,TID)
     for(i in 1:nrow(x)){

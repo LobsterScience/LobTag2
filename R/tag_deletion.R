@@ -1,6 +1,6 @@
 
 #' @title delete_recaptures
-#' @import dplyr ROracle DBI shiny
+#' @import dplyr ROracle DBI shiny shinyjs
 #' @description allows user to delete chosen tag recaptures and associated paths
 #' @export
 
@@ -9,7 +9,6 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
   oracle.personal.user<<-username
   oracle.personal.password<<-password
   oracle.personal.server<<-dbname
-
 
 
   # Function to check if the recapture exists
@@ -48,17 +47,6 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       dbExecute(con, query3)
       dbCommit(con)
 
-      ## check if other recaptures still exist for this tag (re-pathing necessary)
-      q.check <- paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
-      check <- ROracle::dbSendQuery(con, q.check)
-      check <- ROracle::fetch(check)
-
-      dbDisconnect(con)
-      ## regenerate paths for deleted tag if other recaptures exist
-      if(nrow(check)>0){
-        print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
-        generate_paths(tags = paste0(tag_prefix,tag_number))
-      }
       return(TRUE)  # Deletion successful
     }, error = function(e) {
       print(paste("Error in delete_recapture:", e$message))
@@ -67,8 +55,22 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
     return(success)
   }
 
+  ## check if there are still other recaptures for tag (path regeneration necessary)
+  check.regen <- function(tag_prefix, tag_number,con){
+    ## check if other recaptures still exist for this tag (re-pathing necessary)
+    q.check <- paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
+    check <- ROracle::dbSendQuery(con, q.check)
+    check <- ROracle::fetch(check)
+    ## regenerate paths for deleted tag if other recaptures exist
+    if(nrow(check)>0){
+      regen=TRUE
+    }else{regen=FALSE}
+    return(regen)
+  }
+
   # UI
   ui <- fluidPage(
+    useShinyjs(),  ### this line is needed to make delay() function work in server code
     titlePanel("Recapture Deletion"),
     sidebarLayout(
       sidebarPanel(
@@ -84,10 +86,25 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
     )
   )
 
+
+
+
   # Server
-  server <- function(input, output) {
-    # Connect to Oracle database
-    con <- dbConnect(ROracle::Oracle(), username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  server <- function(input, output, session) {
+
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+
+    # Function to update message text
+    update_message <- function(message) {
+      output$delete_message <- renderText(message)
+    }
 
     observeEvent(input$search_button, {
       tag_prefix <- input$tag_prefix
@@ -98,22 +115,23 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       recapture <- check_recapture(tag_prefix, tag_number, date_caught, con)
 
       if (is.null(recapture) || nrow(recapture) == 0) {
-        output$delete_message <- renderText("No recapture found with the specified values.")
+        update_message("No recapture found with the specified values.")
         output$delete_button <- renderUI(NULL)
       } else {
         person <- recapture$PERSON
-        output$delete_message <- renderText({
-          paste("This tag was caught on", date_caught, "by", person, ". Do you want to delete this recapture?")
-        })
+        update_message(paste0("This tag was caught on ", date_caught, " by ", person, ". Do you want to delete this recapture?"))
         output$delete_button <- renderUI({
           actionButton("delete_button", "Delete")
         })
-        outputOptions(output, "delete_button", suspendWhenHidden = FALSE)  # Ensure button remains active
+        outputOptions(output, "delete_button", suspendWhenHidden = TRUE)  # Ensure button becomes inactive
       }
     })
 
     observeEvent(input$delete_button, {
-      print("Delete button clicked")  # Debug message
+
+      # Disable the delete button immediately upon click
+      shinyjs::disable("delete_button")
+      output$delete_button <- renderUI(NULL)  # Hide the delete button
 
       tag_prefix <- input$tag_prefix
       tag_number <- input$tag_number
@@ -122,15 +140,29 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       # Delete the recapture
       delete_success <- delete_recapture(tag_prefix, tag_number, date_caught, con)
 
-      print(paste("Delete success:", delete_success))  # Debug message
-
-      if (delete_success) {
-        output$delete_message <- renderText("Recapture deleted successfully.")
-      } else {
-        output$delete_message <- renderText("Error: Recapture could not be deleted.")
+      # regenerate paths
+      regen_needed <- check.regen(tag_prefix, tag_number, con)
+      if(regen_needed){
+        update_message("There are other recaptures for this tag. Regenerating paths for this tag, please wait ...")
+        print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
+        # Introduce a delay before executing the function
+        delay(10,
+              LobTag2::generate_paths(tags = paste0(tag_prefix, tag_number)))
       }
+      delay(100,
+            if (delete_success) {
+              update_message("Recapture deleted successfully.")
+            } else {
+              update_message("Error: Recapture could not be deleted.")
+            }
+      )
+
     })
+
+
+
   }
+
 
   # Run the application
   shinyApp(ui = ui, server = server)
