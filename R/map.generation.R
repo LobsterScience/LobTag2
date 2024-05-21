@@ -4,10 +4,13 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(user="ELEMENTG", map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
+generate_maps <- function(map.token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
                           person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE,
                           username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
 
+  oracle.personal.user<<-username
+  oracle.personal.password<<-password
+  oracle.personal.server<<-dbname
 
   #### load large base map for inset
   ## Allow user to choose data file to upload or manually draw extent
@@ -15,7 +18,7 @@ generate_maps <- function(user="ELEMENTG", map_token = "pk.eyJ1IjoiZWxlbWVudGpha
   if(result$res %in% "yes"){ext <- draw_ext()}else{ext <- readRDS("C:/bio/LobTag2/app.files/NS_extent")}
 
   set_defaults(ext, map_service = "mapbox",map_type = "satellite",
-               map_token = map_token)
+               map_token = map.token)
 
   inset <- basemap_raster(ext) #### forces basemap crs to be in 3857
 
@@ -34,10 +37,10 @@ generate_maps <- function(user="ELEMENTG", map_token = "pk.eyJ1IjoiZWxlbWVudGpha
   })
 
 ## bring in paths
-sql = paste0("SELECT * FROM ",user,".LBT_PATH")
+sql = paste0("SELECT * FROM ",oracle.personl.user,".LBT_PATH")
 path <- ROracle::dbSendQuery(conn, sql)
 path <- ROracle::fetch(path)
-sql = paste0("SELECT * FROM ",user,".LBT_PATHS")
+sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
@@ -47,7 +50,7 @@ paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
 people = person
 if(all.people){
   ## get all names who've recaptured tags
-  sql = paste0("SELECT * FROM ",user,".LBT_RECAPTURES")
+  sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES")
   rec <- ROracle::dbSendQuery(conn, sql)
   rec <- ROracle::fetch(rec)
   people <- unique(rec$PERSON)
@@ -162,7 +165,7 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     sf::st_crs(ext_sf) <- 4326
 
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
-                 map_token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw")
+                 map_token = map.token)
 
     base <- basemap_raster(ext_sf) #### forces basemap crs to be in 3857
 
