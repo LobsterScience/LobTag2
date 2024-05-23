@@ -3,9 +3,9 @@ Installation
 
 Enter these lines into the R console to install the package:
 
-Install.packages(“devtools”)
+Install.packages('devtools')
 
-devtools::install_github(“jakeelement/LobTag2”)
+devtools::install_github('jakeelement/LobTag2')
 
 After installation, find the location of your user guide by entering:
 
