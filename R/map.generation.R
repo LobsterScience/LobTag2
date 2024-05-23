@@ -37,7 +37,7 @@ generate_maps <- function(map.token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZm
   })
 
 ## bring in paths
-sql = paste0("SELECT * FROM ",oracle.personl.user,".LBT_PATH")
+sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_PATH")
 path <- ROracle::dbSendQuery(conn, sql)
 path <- ROracle::fetch(path)
 sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_PATHS")
