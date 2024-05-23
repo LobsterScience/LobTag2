@@ -3,7 +3,7 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, tags = "all", depth.raster.path = "C:/bio/LobTag2/app.files/depthraster2.tif", neighborhood = 16, type = "least.cost"){
+generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost"){
 
   oracle.personal.user<<-username
   oracle.personal.password<<-password

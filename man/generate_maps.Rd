@@ -5,8 +5,7 @@
 \title{generate_maps}
 \usage{
 generate_maps(
-  user = "ELEMENTG",
-  map_token =
+  map.token =
     "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
   person = NULL,
   output.location = "C:/Users/ELEMENTG/Documents/Rsaves",
