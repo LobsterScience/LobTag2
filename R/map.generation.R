@@ -14,7 +14,7 @@ generate_maps <- function(map.token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZm
 
   #### load large base map for inset
   ## Allow user to choose data file to upload or manually draw extent
-  result <- dlgMessage(type = "yesno", message = "Would you like to mannually draw the mapping area? If No, the default basemap will be used")
+  result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the default basemap will be used")
   if(result$res %in% "yes"){ext <- draw_ext()}else{ext <- readRDS(system.file("data", "NS_extent", package = "LobTag2"))}
 
   set_defaults(ext, map_service = "mapbox",map_type = "satellite",

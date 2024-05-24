@@ -197,7 +197,7 @@ if(return_error){
       verbatimTextOutput("text_output"),
 
       # Button to download the table
-      downloadButton("download_table", label = "Download Table")
+      downloadButton("download_table", label = "Download Error Table")
     )
   )
 

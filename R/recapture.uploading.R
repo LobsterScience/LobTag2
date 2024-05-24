@@ -25,7 +25,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new Oracle table called: ",oracle.personal.user,".",table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -42,7 +42,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
     LAT_DD VARCHAR2(50),
     LON_DD VARCHAR2(50),
     FATHOMS VARCHAR2(50),
-    RELCODE VARCHAR2(50),
+    RELEASED VARCHAR2(50),
     CAPTAIN VARCHAR2(100),
     VESSEL VARCHAR2(100),
     YEAR VARCHAR2(50),
@@ -64,7 +64,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
     result <- dbGetQuery(con, query)
     # If the table does not exist, create it
     if (result[[1]] == 0) {
-      print(paste0("Creating new Oracle table called: ",username,".",table_name))
+      print(paste0("Creating new Oracle table called: ",oracle.personal.user,".",table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -170,7 +170,10 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
 
         # Input: Longitude Degrees (Mandatory)
         div(class = "mandatory-field",
-            numericInput("long_deg", "Longitude Degrees:", value = NULL, min = -180, max = 180)),
+            numericInput("long_deg", "Longitude Degrees:", value = NULL, min = -180, max = 0)),
+
+        # Longitude format reminder message:
+        uiOutput("reminder"),
 
         # Input: Longitude Decimal Minutes (Mandatory)
         div(class = "mandatory-field",
@@ -247,7 +250,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
     # Observer to check if Tag Prefix and Tag Number combination exists in the Oracle table
     observeEvent(c(input$tag_prefix, input$tag_number), {
       if (nchar(input$tag_prefix) > 0 & is.numeric(input$tag_number)) {
-        query <- paste("SELECT * FROM ",username,".LBT_RELEASES WHERE TAG_PREFIX = '", input$tag_prefix, "' AND TAG_NUM = ", input$tag_number, sep = "")
+        query <- paste("SELECT * FROM ",oracle.personal.user,".LBT_RELEASES WHERE TAG_PREFIX = '", input$tag_prefix, "' AND TAG_NUM = ", input$tag_number, sep = "")
         result <- dbGetQuery(con, query)
         if (nrow(result) == 0) {
           # Update style and display warning message if combination not found
@@ -260,17 +263,26 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
           # Remove error style and message if combination found
           shinyjs::removeClass("tag_number", "error-input")
           shinyjs::removeClass("tag_prefix", "error-input")
-          output$release_error <- renderText({
-            ""
+          output$release_error <- renderText({""})}
+      }
+
+    })
+
+    ## conditional reminder if user enters positive longitude
+    observeEvent(c(input$long_deg), {
+      if(is.numeric(input$long_deg)){
+        if(input$long_deg > 0){
+          output$reminder <- renderText({
+            HTML("<span style='color: red;'>Careful! Degrees Longitude must be negative for western hemisphere!</span>")
           })
-        }
+        }else{output$reminder <- renderText({""})}
       }
     })
 
     # Real-time data retrieval based on "Person" field input
     observeEvent(input$person, {
       if (nchar(input$person) > 0) {
-        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM ",username,".LBT_PEOPLE WHERE NAME = '", input$person, "'", sep = "")
+        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM ",oracle.personal.user,".LBT_PEOPLE WHERE NAME = '", input$person, "'", sep = "")
         result <- dbGetQuery(con, query)
         if (nrow(result) > 0) {
           updateTextInput(session, "street_address", value = result$CIVIC)
@@ -342,7 +354,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
       # Prepare SQL insert statement
-      sql_1 <- paste("INSERT INTO ",username,".LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS, RELCODE, FATHOMS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "', ", released, ", ", depth_fathoms, ")", sep="")
+      sql_1 <- paste("INSERT INTO ",oracle.personal.user,".LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'DD/MM/YYYY')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')", sep="")
 
       # Execute SQL insert statement
       dbExecute(con, sql_1)
@@ -350,7 +362,7 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
       # Prepare SQL update/insert statement for the LBT_PEOPLE table and insert data
       if (nchar(input$person) > 0){
         sql_2 <- paste("
-      MERGE INTO ",username,".LBT_PEOPLE tgt
+      MERGE INTO ",oracle.personal.user,".LBT_PEOPLE tgt
       USING (SELECT '", input$person, "' AS name FROM dual) src
       ON (tgt.NAME = src.name)
       WHEN MATCHED THEN
@@ -414,6 +426,8 @@ upload_recaptures <- function(username = oracle.personal.user, password = oracle
     session$onSessionEnded(function() {
       dbDisconnect(con)
     })
+
+
   }
 
   # Run the application
@@ -454,7 +468,7 @@ batch_upload_recaptures <- function(username = oracle.personal.user, password = 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new Oracle table called: ",oracle.personal.user,".",table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -493,7 +507,7 @@ batch_upload_recaptures <- function(username = oracle.personal.user, password = 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new Oracle table called: ",oracle.personal.user,".",table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -662,8 +676,8 @@ batch_upload_recaptures <- function(username = oracle.personal.user, password = 
   if(!return_error){
     ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
 
-    table_name <- paste0(username,".LBT_RECAPTURES")
-    people.tab.name <- paste0(username,".LBT_PEOPLE")
+    table_name <- paste0(oracle.personal.user,".LBT_RECAPTURES")
+    people.tab.name <- paste0(oracle.personal.user,".LBT_PEOPLE")
     ### open ORACLE connection
     tryCatch({
       drv <- DBI::dbDriver("Oracle")

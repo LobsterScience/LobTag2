@@ -81,7 +81,7 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
         uiOutput("delete_button")  # Placeholder for delete button
       ),
       mainPanel(
-        textOutput("delete_message")
+        uiOutput("delete_message")
       )
     )
   )
@@ -101,9 +101,11 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
     }, finally = {
     })
 
-    # Function to update message text
-    update_message <- function(message) {
-      output$delete_message <- renderText(message)
+    # Function to update message text with HTML for color
+    update_message <- function(message, color = "black") {
+      output$delete_message <- renderUI({
+        HTML(paste0("<span style='color:", color, ";'>", message, "</span>"))
+      })
     }
 
     observeEvent(input$search_button, {
@@ -143,7 +145,7 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       # regenerate paths
       regen_needed <- check.regen(tag_prefix, tag_number, con)
       if(regen_needed){
-        update_message("There are other recaptures for this tag. Regenerating paths for this tag, please wait ...")
+        update_message("There are other recaptures for this tag! Regenerating paths for this tag, please wait ...     DO NOT CLOSE THIS WINDOW!",color = "red")
         print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
         # Introduce a delay before executing the function
         delay(10,
@@ -151,9 +153,9 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       }
       delay(100,
             if (delete_success) {
-              update_message("Recapture deleted successfully.")
+              update_message("Recapture deleted successfully! Close this window if you are done deleting.")
             } else {
-              update_message("Error: Recapture could not be deleted.")
+              update_message("Error: Recapture could not be deleted.", color = "red")
             }
       )
 
