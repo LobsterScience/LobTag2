@@ -3,29 +3,34 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost"){
-
-  oracle.personal.user<<-username
-  oracle.personal.password<<-password
-  oracle.personal.server<<-dbname
+generate_paths <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost"){
 
   ## Check if path tables already exist and create them if they don't
-
-  tryCatch({
-    drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
-  }, warning = function(w) {
-  }, error = function(e) {
-    return(toJSON("Connection failed"))
-  }, finally = {
-  })
+  ### open db connection
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    dir.create("C:/LOBTAG",showWarnings = F)
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
   table_name <- "LBT_PATH"
-  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  result <- dbGetQuery(con, query)
 
+  ## look for existing table
+  if(db %in% "Oracle"){
+    query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+
+  result <- dbGetQuery(con, query)
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new table called: ",ifelse(db %in% "Oracle",paste0(oracle.user,"."),""),table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -43,11 +48,15 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
   }
 
   table_name <- "LBT_PATHS"
-  query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  result <- dbGetQuery(con, query)
 
+  ## look for existing table
+  if(db %in% "Oracle"){
+    query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+
+  result <- dbGetQuery(con, query)
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new table called: ",ifelse(db %in% "Oracle",paste0(oracle.user,"."),""),table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -74,31 +83,43 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
 
   ## make table with all recaptures and their release information
 
-  tryCatch({
-    drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
-  }, warning = function(w) {
-  }, error = function(e) {
-    return(toJSON("Connection failed"))
-  }, finally = {
-  })
+  ### open db connection
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
-  query = paste0("SELECT * FROM ",username,".LBT_RECAPTURES")
+  query = paste0("SELECT * FROM LBT_RECAPTURES")
   recaptures <- ROracle::dbSendQuery(con, query)
   recaptures <- ROracle::fetch(recaptures)
 
   cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
-  query = paste0("SELECT * FROM ",username,".LBT_RELEASES WHERE TAG_ID in ",cap.samps)
+  query = paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID in ",cap.samps)
   releases <- ROracle::dbSendQuery(con, query)
   releases <- ROracle::fetch(releases)
 
+  ## filter back so that only recaptures that have releases are pathed. Warn user about any recaptures that don't have releases
+  if(!(length(unique(recaptures$TAG_ID))==length(unique(releases$TAG_ID)))){
+    base::message("WARNING! There are recaptured tags that don't have initial release coordinates! Only pathing tags that have release data.")
+    recaptures <- recaptures %>% filter(TAG_ID %in% releases$TAG_ID)
+  }
+
+
   rel.prep <- releases %>% dplyr::select(TAG_ID, LAT_DD,LON_DD, REL_DATE,TAG_NUM,TAG_PREFIX) %>% rename(rel_lat = LAT_DD, rel_lon = LON_DD)
   rec.prep <- recaptures %>% dplyr::select(TAG_ID, LAT_DD,LON_DD,REC_DATE,PERSON) %>% rename(rec_lat = LAT_DD, rec_lon = LON_DD)
-  rec.prep$REC_DATE = as.Date(rec.prep$REC_DATE, format= "%d/%m/%Y")
+  rec.prep$REC_DATE = as.Date(rec.prep$REC_DATE, format= "%Y-%m-%d")
   pdat <- left_join(rec.prep,rel.prep)
 
   ## find tags that have not yet been pathed
-  dat <- ROracle::dbSendQuery(con, paste0("SELECT * FROM ",username,".LBT_PATH"))
+  dat <- ROracle::dbSendQuery(con, paste0("SELECT * FROM LBT_PATH"))
   dat <-  ROracle::fetch(dat)
   ROracle::dbDisconnect(con)
 
@@ -192,7 +213,7 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
       events <- NULL
       for(j in 1:nrow(cor)){
         if(j<nrow(cor)){events <- rbind(events,c(x$REL_DATE[i],NA,NA))}
-        if(j==nrow(cor)){events <- rbind(events,c(x$REL_DATE[i],format(x$REC_DATE[i], "%d/%m/%Y"),x$PERSON[i]))}
+        if(j==nrow(cor)){events <- rbind(events,c(x$REL_DATE[i],format(x$REC_DATE[i], "%Y-%m-%d"),x$PERSON[i]))}
       }
 
       dxp = cbind(rep(x$PID[i], nrow(cor)),rep(count, nrow(cor)), 1:nrow(cor), cor$X, cor$Y,x$TAG_NUM[i],x$TAG_PREFIX[i],events)
@@ -213,22 +234,43 @@ generate_paths <- function(username = oracle.personal.user, password = oracle.pe
     names(df2towrite) = c("TID", "CID", "CDATE", "DIST", "TAG_NUM","TAG_PREFIX")
     names(dxtowrite) = c("TID", "CID", "POS", "LON", "LAT", "TAG_NUM","TAG_PREFIX","REL_DATE","REC_DATE","REC_PERSON")
 
-    #add data to oracle
-    drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+    #add data to database
+    ### open db connection
+    if(db %in% "Oracle"){
+      tryCatch({
+        drv <- DBI::dbDriver("Oracle")
+        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      }, warning = function(w) {
+      }, error = function(e) {
+        return(toJSON("Connection failed"))
+      }, finally = {
+      })
+    }else{
+      con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+    }
 
-      pathdb = paste(username,".","LBT_PATH", sep = "")
-      pathsdb = paste(username,".","LBT_PATHS", sep = "")
 
-      path_call = create_sql_query(pathdb, df2towrite)
-      paths_call = create_sql_query(pathsdb, dxtowrite)
+      if(db %in% "Oracle"){
+        pathdb = "LBT_PATH"
+        pathsdb = "LBT_PATHS"
 
-      result <- ROracle::dbSendQuery(con, path_call)
-      result <- ROracle::dbSendQuery(con, paths_call)
+        path_call = create_sql_query(pathdb, df2towrite)
+        paths_call = create_sql_query(pathsdb, dxtowrite)
 
-      ROracle::dbCommit(con)
-      ROracle::dbDisconnect(con)
-      print("New paths calculated and written to paths table.")
+        result <- ROracle::dbSendQuery(con, path_call)
+        result <- ROracle::dbSendQuery(con, paths_call)
+
+        ROracle::dbCommit(con)
+
+        print("New paths calculated and written to path tables.")
+
+      }else{
+        dbWriteTable(con, "LBT_PATH", df2towrite, append = TRUE, row.names = FALSE)
+        dbWriteTable(con, "LBT_PATHS", dxtowrite, append = TRUE, row.names = FALSE)
+        print("New paths calculated and written to path tables.")
+        }
+
+    ROracle::dbDisconnect(con)
   }else{
     print("No new paths created.")  }
 

@@ -1,33 +1,39 @@
 #' @title upload_releases
-#' @import dplyr ROracle DBI shiny DT svDialogs
+#' @import dplyr ROracle RSQLite DBI shiny DT svDialogs
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
+upload_releases <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
-  oracle.personal.user<<-username
-  oracle.personal.password<<-password
-  oracle.personal.server<<-dbname
 
-  # Check if releases table already exists
-
+  # Check if releases table already exists and create if not
+if(db %in% "Oracle"){
   tryCatch({
     drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+    con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
   }, warning = function(w) {
   }, error = function(e) {
     return(toJSON("Connection failed"))
   }, finally = {
   })
+  }else{
+    dir.create("C:/LOBTAG", showWarnings = F)
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
 
   table_name <- "LBT_RELEASES"
+
+  ## look for existing table
+  if(db %in% "Oracle"){
   query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
+  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+
   result <- dbGetQuery(con, query)
 
   # If the table does not exist, create it
   if (result[[1]] == 0) {
-    print(paste0("Creating new Oracle table called: ",username,".",table_name))
+    print(paste0("Creating new table called: ",ifelse(db %in% "Oracle",paste0(oracle.user,"."),""),table_name))
     # Define the SQL statement to create the table
     sql_statement <- paste0("
     CREATE TABLE ",table_name," (
@@ -64,10 +70,9 @@ upload_releases <- function(username = oracle.personal.user, password = oracle.p
     # Execute the SQL statement
     dbSendQuery(con, sql_statement)
 
-    # Close the connection
-    dbDisconnect(con)
-
   }
+  # Close the connection
+  dbDisconnect(con)
 
 ####################################################################################################
 
@@ -93,7 +98,7 @@ for(i in 1:nrow(releases)){
 
 ##date column isn't 100% necessary but it's a good indication if things are going wrong
 releases$REL_DATE = paste(releases$DAY, releases$MONTH, releases$YEAR, sep = "/")
-releases$REL_DATE = format(as.Date(releases$REL_DATE, format = "%d/%m/%Y"), "%d/%m/%Y")
+releases$REL_DATE = format(as.Date(releases$REL_DATE, format = "%d/%m/%Y"), "%Y-%m-%d")
 releases$TAG_ID = paste0(releases$TAG_PREFIX,releases$TAG_NUM)
 
 ## retrieve only selected variables if there are extra / differently ordered columns
@@ -224,18 +229,19 @@ if(return_error){
 }
 
 if(!return_error){
-  ###### ORACLE UPLOAD HERE. Check that entry doesn't already exist before uploading
+  ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
-  table_name <- paste0(username,".LBT_RELEASES")
-  ### open ORACLE connection
-  tryCatch({
-    drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
-  }, warning = function(w) {
-  }, error = function(e) {
-    return(toJSON("Connection failed"))
-  }, finally = {
-  })
+  ### open db connection
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
 
   ## check for already entered tags, then upload all new tag entries
   entered =NULL
@@ -248,6 +254,7 @@ if(!return_error){
 
   if(nrow(existing_tag)==0){
     sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+    if(db %in% "local"){dbBegin(con)}
     result <- dbSendQuery(con, sql)
     dbCommit(con)
     dbClearResult(result)
