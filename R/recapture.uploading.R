@@ -662,6 +662,8 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   bad_lat = which(rec$LAT_DD %in% NA | nchar(as.character(rec$LAT_DD))<2 | !is.numeric(rec$LAT_DD))
   bad_lon = which(rec$LON_DD %in% NA | nchar(as.character(rec$LON_DD))<2 | !is.numeric(rec$LON_DD))
   sus_lon = which(rec$LON_DD>0) ## suspect longitudes not in the Western hemisphere
+  neg_lat.min = which(!is.na(rec$LAT_MINUTE) & rec$LAT_MINUTE<0)
+  neg_lon.min = which(!is.na(rec$LON_MINUTE) & rec$LON_MINUTE<0)
   bad_date = which(rec$REL_DATE %in% NA)
 
   ## check if any recapture events seems to be replicates
@@ -670,9 +672,11 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
 
   error_out= ""
   error_tab = NULL
+  warning_out= ""
+  warning_tab = NULL
   return_error = FALSE
   return_warning = FALSE
-
+################################ errors
   if(length(bad_tag_pre) > 0){
     for(i in bad_tag_pre){
       error_out = paste(error_out, "\nMissing tag prefix for tag number:",rec$TAG_NUMBER[i],"at row:",i)
@@ -715,10 +719,25 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     }
     return_error = TRUE
   }
+  if(length(neg_lat.min) > 0){
+    for(i in neg_lat.min){
+      error_out = paste(error_out, "\nNegative Latitude Minutes found for tag:", rec$TAG_ID[i],"at row:",i,"These should never be negative.")
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Negative Latitude Minutes"))
+    }
+    return_error = TRUE
+  }
+  if(length(neg_lon.min) > 0){
+    for(i in neg_lon.min){
+      error_out = paste(error_out, "\nNegative Longitude Minutes found for tag:", rec$TAG_ID[i],"at row:",i,"These should never be negative.")
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Negative Longitude Minutes"))
+    }
+    return_error = TRUE
+  }
+  ########################## Warnings
   if(length(sus_lon)>0){
     for(i in sus_lon){
-      error_out = paste(error_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rec$TAG_ID[i],"at row:",i)
-      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUM[i],"Suspicious positive longitude"))
+      warning_out = paste(warning_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rec$TAG_ID[i],"at row:",i)
+      warning_tab = rbind(warning_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Suspicious positive longitude"))
     }
     return_warning = TRUE
   }
@@ -736,7 +755,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
         verbatimTextOutput("text_output"),
 
         # Button to download the table
-        downloadButton("download_table", label = "Download Table")
+        downloadButton("download_table", label = "Download Error Table")
       )
     )
 
@@ -763,7 +782,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   }
 
   if(!return_error & return_warning){
-    colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Warning")
+    colnames(warning_tab)=c("Row","Tag Prefix","Tag Number","Warning")
     ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
     # Define the UI
     ui <- fluidPage(
@@ -791,7 +810,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       })
       # Display the text from the string variable
       output$text_output <- renderText({
-        error_out
+        warning_out
       })
 
       # Function to generate a downloadable file
@@ -800,7 +819,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
           "recaptures_uploading_warnings.csv"
         },
         content = function(file) {
-          write.csv(error_tab, file,row.names = F)
+          write.csv(warning_tab, file,row.names = F)
         }
       )
 

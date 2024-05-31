@@ -140,14 +140,18 @@ repeat_tags = which(duplicated(rel$TAG_ID)==TRUE)
 bad_lat = which(rel$LAT_DD %in% NA | nchar(as.character(rel$LAT_DD))<2 | !is.numeric(rel$LAT_DD))
 bad_lon = which(rel$LON_DD %in% NA | nchar(as.character(rel$LON_DD))<2 | !is.numeric(rel$LON_DD))
 sus_lon = which(rel$LON_DD>0) ## suspect longitudes not in the Western hemisphere
+neg_lat.min = which(!is.na(rel$LAT_MINUTES) & rel$LAT_MINUTES<0)
+neg_lon.min = which(!is.na(rel$LON_MINUTES) & rel$LON_MINUTES<0)
 bad_date = which(rel$REL_DATE %in% NA)
 
 
 error_out= ""
 error_tab = NULL
+warning_out= ""
+warning_tab = NULL
 return_error = FALSE
 return_warning = FALSE
-
+################################# Errors
 if(length(bad_tag_pre) > 0){
   for(i in bad_tag_pre){
     error_out = paste(error_out, "\nMissing tag prefix for tag number:",rel$TAG_NUM[i],"at row:",i)
@@ -190,10 +194,25 @@ if(length(bad_date) > 0){
   }
   return_error = TRUE
 }
+if(length(neg_lat.min) > 0){
+  for(i in neg_lat.min){
+    error_out = paste(error_out, "\nNegative Latitude Minutes found for tag:", rel$TAG_ID[i],"at row:",i,"These should never be negative.")
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Negative Latitude Minutes"))
+  }
+  return_error = TRUE
+}
+if(length(neg_lon.min) > 0){
+  for(i in neg_lon.min){
+    error_out = paste(error_out, "\nNegative Longitude Minutes found for tag:", rel$TAG_ID[i],"at row:",i,"These should never be negative.")
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Negative Longitude Minutes"))
+  }
+  return_error = TRUE
+}
+############################## Warnings
 if(length(sus_lon)>0){
   for(i in sus_lon){
-    error_out = paste(error_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rel$TAG_ID[i],"at row:",i)
-    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Suspicious positive longitude"))
+    warning_out = paste(warning_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rel$TAG_ID[i],"at row:",i)
+    warning_tab = rbind(warning_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Suspicious positive longitude"))
   }
   return_warning = TRUE
 }
@@ -238,7 +257,7 @@ if(return_error){
 
 
 if(!return_error & return_warning){
-    colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Warning")
+    colnames(warning_tab)=c("Row","Tag Prefix","Tag Number","Warning")
     ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
     # Define the UI
     ui <- fluidPage(
@@ -266,7 +285,7 @@ if(!return_error & return_warning){
       })
       # Display the text from the string variable
       output$text_output <- renderText({
-        error_out
+        warning_out
       })
 
       # Function to generate a downloadable file
@@ -275,7 +294,7 @@ if(!return_error & return_warning){
           "releases_uploading_warnings.csv"
         },
         content = function(file) {
-          write.csv(error_tab, file,row.names = F)
+          write.csv(warning_tab, file,row.names = F)
         }
       )
 
