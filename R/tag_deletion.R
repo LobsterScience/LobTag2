@@ -4,19 +4,15 @@
 #' @description allows user to delete chosen tag recaptures and associated paths
 #' @export
 
-delete_recaptures <- function(username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
-
-  oracle.personal.user<<-username
-  oracle.personal.password<<-password
-  oracle.personal.server<<-dbname
-
+delete_recaptures <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
   # Function to check if the recapture exists
   check_recapture <- function(tag_prefix, tag_number, date_caught, con) {
-    # Convert date to Oracle date format
-    date_caught_oracle <- format(as.Date(date_caught, "%Y-%m-%d"), "%d/%m/%Y")
 
-    query <- paste0("SELECT PERSON FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle, "'")
+    # Convert date to desired format
+    date_caught_oracle <- format(as.Date(date_caught, "%Y-%m-%d"), "%Y-%m-%d")
+
+    query <- paste0("SELECT PERSON FROM LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle, "'")
     result <- tryCatch({
       dbGetQuery(con, query)
     }, error = function(e) {
@@ -24,24 +20,26 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
       return(NULL)
     })
     return(result)
+
   }
 
   # Function to delete the recapture
   delete_recapture <- function(tag_prefix, tag_number, date_caught, con) {
-    # Convert date to Oracle date format
-    date_caught_oracle <- format(as.Date(date_caught, "%Y-%m-%d"), "%d/%m/%Y")
+    # Convert date to desired format
+    date_caught_oracle <- format(as.Date(date_caught, "%Y-%m-%d"), "%Y-%m-%d")
 
     ## delete recapture
-    query1 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle, "'")
+    query1 <- paste0("DELETE FROM LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number, "' AND REC_DATE = '", date_caught_oracle, "'")
 
     ## delete all single paths for tag
-    query2 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_PATH WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
+    query2 <- paste0("DELETE FROM LBT_PATH WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
 
     ## delete all paths for tag
-    query3 <- paste0("DELETE FROM ",oracle.personal.user,".LBT_PATHS WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
+    query3 <- paste0("DELETE FROM LBT_PATHS WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUM = '", tag_number, "'")
 
     # Execute the delete querys
     success <- tryCatch({
+      if(db %in% "local"){dbBegin(con)}
       dbExecute(con, query1)
       dbExecute(con, query2)
       dbExecute(con, query3)
@@ -58,7 +56,7 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
   ## check if there are still other recaptures for tag (path regeneration necessary)
   check.regen <- function(tag_prefix, tag_number,con){
     ## check if other recaptures still exist for this tag (re-pathing necessary)
-    q.check <- paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
+    q.check <- paste0("SELECT * FROM LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
     check <- ROracle::dbSendQuery(con, q.check)
     check <- ROracle::fetch(check)
     ## regenerate paths for deleted tag if other recaptures exist
@@ -92,14 +90,19 @@ delete_recaptures <- function(username = oracle.personal.user, password = oracle
   # Server
   server <- function(input, output, session) {
 
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
+    ### open db connection
+    if(db %in% "Oracle"){
+      tryCatch({
+        drv <- DBI::dbDriver("Oracle")
+        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      }, warning = function(w) {
+      }, error = function(e) {
+        return(toJSON("Connection failed"))
+      }, finally = {
+      })
+    }else{
+      con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+    }
 
     # Function to update message text with HTML for color
     update_message <- function(message, color = "black") {

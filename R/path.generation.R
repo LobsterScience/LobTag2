@@ -82,7 +82,8 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
 #################################################################################################################################################
 
   ## make table with all recaptures and their release information
-
+  recheck=TRUE
+while(recheck){
   ### open db connection
   if(db %in% "Oracle"){
     tryCatch({
@@ -131,7 +132,51 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
   ## Don't re-generate paths that already exist
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
   if(length(pathed)>0){x = pdat[-pathed,]}else{x=pdat}
+  ##Unless... there are new recaptures with dates earlier then current most recent recapture; in these cases will need to clear and regenerate the whole path
+  repath = NULL
+  for(i in unique(x$TAG_ID)){
+    tab <- x %>% filter(TAG_ID %in% i)
+    d <- unique(tab$REC_DATE)
+    p.tab <- pdat[pathed,] %>% filter(TAG_ID %in% i)
+    earlier <- any(tab$REC_DATE<max(p.tab$REC_DATE))
+    if(earlier){repath=c(delete,i)}
+  }
+if(length(repath)>0){
+  base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
+  for(i in repath){
+    ## delete all single paths for tag
+    query1 <- paste0("DELETE FROM LBT_PATH WHERE TID = '", i, "'")
+
+    ## delete all paths for tag
+    query2 <- paste0("DELETE FROM LBT_PATHS WHERE TID = '",i,"'")
+
+    # Execute the delete querys
+    if(db %in% "local"){dbBegin(con)}
+    dbExecute(con, query1)
+    dbExecute(con, query2)
+    dbCommit(con)
+
+  }
+  ROracle::dbDisconnect(con)
+  ## if recheck is true, start back over and re-query the database with bad paths removed
+  recheck=TRUE
+  }else{recheck=FALSE}
+
+
+  } ## checking done, begin path creation
   ## create paths
   x <- x %>% rename(PID=TAG_ID)
 
@@ -267,7 +312,7 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
       }else{
         dbWriteTable(con, "LBT_PATH", df2towrite, append = TRUE, row.names = FALSE)
         dbWriteTable(con, "LBT_PATHS", dxtowrite, append = TRUE, row.names = FALSE)
-        print("New paths calculated and written to path tables.")
+        print("New paths calculated and written to paths tables.")
         }
 
     ROracle::dbDisconnect(con)

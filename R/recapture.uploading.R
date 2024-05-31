@@ -193,7 +193,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
         numericInput("depth_fathoms", "Depth (fathoms):", value = NULL, min = 0),
 
         # Input: Released
-        selectInput("relcode", "Released?",choices = c("","yes", "no", "unknown")),
+        selectInput("released", "Released?",choices = c("","yes", "no", "unknown")),
 
         # Input: Captain
         textInput("captain", "Captain"),
@@ -359,7 +359,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
       # Check if selected and numeric (non-mandatory) fields are empty and handle by making null
       # selected values
-      released <- ifelse(input$relcode == "", "NULL", input$relcode)
+      released <- ifelse(input$released == "", "NULL", input$released)
       sex <- ifelse(input$sex == "", "NULL", input$sex)
       egg_state <- ifelse(input$egg_state == "", "NULL", input$egg_state)
       # numeric values
@@ -376,7 +376,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
         "INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) ",
         "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ",
         lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ",
-        depth_fathoms, ", ", released, ", '", input$captain, "', '", input$vessel, "', strftime('%Y', '", date, "'), '",
+        depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', strftime('%Y', '", date, "'), '",
         input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')"
       )}
 
@@ -475,7 +475,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
       shinyjs::reset("long_deg")
       shinyjs::reset("long_dec_min")
       shinyjs::reset("depth_fathoms")
-      shinyjs::reset("relcode")
+      shinyjs::reset("released")
       shinyjs::reset("captain")
       shinyjs::reset("vessel")
       shinyjs::reset("management_area")
@@ -560,7 +560,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     LAT_DD VARCHAR2(50),
     LON_DD VARCHAR2(50),
     FATHOMS VARCHAR2(50),
-    RELCODE VARCHAR2(50),
+    RELEASED VARCHAR2(50),
     CAPTAIN VARCHAR2(100),
     VESSEL VARCHAR2(100),
     YEAR VARCHAR2(50),
@@ -661,6 +661,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
 
   bad_lat = which(rec$LAT_DD %in% NA | nchar(as.character(rec$LAT_DD))<2 | !is.numeric(rec$LAT_DD))
   bad_lon = which(rec$LON_DD %in% NA | nchar(as.character(rec$LON_DD))<2 | !is.numeric(rec$LON_DD))
+  sus_lon = which(rec$LON_DD>0) ## suspect longitudes not in the Western hemisphere
   bad_date = which(rec$REL_DATE %in% NA)
 
   ## check if any recapture events seems to be replicates
@@ -670,6 +671,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   error_out= ""
   error_tab = NULL
   return_error = FALSE
+  return_warning = FALSE
 
   if(length(bad_tag_pre) > 0){
     for(i in bad_tag_pre){
@@ -713,6 +715,13 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     }
     return_error = TRUE
   }
+  if(length(sus_lon)>0){
+    for(i in sus_lon){
+      error_out = paste(error_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUM[i],"Suspicious positive longitude"))
+    }
+    return_warning = TRUE
+  }
 
   if(return_error){
     colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Error")
@@ -753,7 +762,172 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     return(shinyApp(ui = ui, server = server))
   }
 
-  if(!return_error){
+  if(!return_error & return_warning){
+    colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Warning")
+    ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
+    # Define the UI
+    ui <- fluidPage(
+      titlePanel("Uploading Warnings"),
+      mainPanel(
+        uiOutput("dynamicUI")
+
+      )
+    )
+
+    # Define the server logic
+    server <- function(input, output) {
+############################################# Dialogue 1
+      # Initial content in the main panel
+      output$dynamicUI <- renderUI({
+        h3("Check issues below before proceeding with upload:")
+      })
+      output$dynamicUI <- renderUI({
+        h4(verbatimTextOutput("text_output"),
+           # Button to download the table
+           downloadButton("download_table", label = "Download Warning Table"),
+           # Button to proceed with upload
+           actionButton(inputId = "upload_table", label = "Ignore Warnings and Upload Data")
+        )
+      })
+      # Display the text from the string variable
+      output$text_output <- renderText({
+        error_out
+      })
+
+      # Function to generate a downloadable file
+      output$download_table <- downloadHandler(
+        filename = function() {
+          "recaptures_uploading_warnings.csv"
+        },
+        content = function(file) {
+          write.csv(error_tab, file,row.names = F)
+        }
+      )
+
+
+    observeEvent(input$upload_table,{
+      ###### Database UPLOAD HERE. Check that entry doesn't already exist before uploading
+
+      table_name <- "LBT_RECAPTURES"
+      people.tab.name <- "LBT_PEOPLE"
+      # Connect to database
+      if(db %in% "Oracle"){
+        tryCatch({
+          drv <- DBI::dbDriver("Oracle")
+          con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+        }, warning = function(w) {
+        }, error = function(e) {
+          return(toJSON("Connection failed"))
+        }, finally = {
+        })
+      }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+
+      ## check for already entered recapture events, then upload all new recaptures
+      entered =NULL
+      for(i in 1:nrow(rec)){
+        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
+        sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+        check <- dbSendQuery(con, sql)
+        existing_event <- dbFetch(check)
+        entered <- rbind(entered,existing_event)
+        dbClearResult(check)
+
+        if(nrow(existing_event)==0){
+          sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+          if(db %in% "local"){dbBegin(con)}
+          result <- dbSendQuery(con, sql)
+          dbCommit(con)
+          dbClearResult(result)
+        }
+
+        ## check and update PEOPLE table if person is new
+        sql <- paste("SELECT * FROM ",people.tab.name, " WHERE NAME = '", rec$PERSON[i],"'",sep = "")
+        check <- dbSendQuery(con, sql)
+        existing_person <- dbFetch(check)
+        dbClearResult(check)
+
+        if(nrow(existing_person)==0){
+          sql <- paste("INSERT INTO ",people.tab.name, " VALUES ('",rec$PERSON[i],"', '",rec$CIVIC[i],"', '",rec$TOWN[i],"', '",rec$PROV[i],"','",rec$COUNTRY[i],"','",rec$POST[i],"','",rec$EMAIL[i],"','",rec$PHO1[i],"','",rec$PHO2[i],"','",rec$AFFILIATION[i],"','",rec$LICENSE_AREA[i],"')", sep = "")
+          if(db %in% "local"){dbBegin(con)}
+          result <- dbSendQuery(con, sql)
+          dbCommit(con)
+          dbClearResult(result)
+        }
+
+      }
+
+      dbDisconnect(con)
+
+      ### show interactive info window if there were any tags found to be already entered
+      if(nrow(entered)>0){
+        # Define the UI
+        ui <- fluidPage(
+          titlePanel("Uploading Warnings"),
+          mainPanel(
+            uiOutput("dynamicUI")
+
+          )
+        )
+        # Dynamically render new UI elements
+        output$dynamicUI <- renderUI({
+          fluidPage(
+          tags$br(),
+          h4("Upload Success! Recaptures for the following tags by the same person on the same day were found already in the database, these are assumed to be the same event so were not uploaded:"),
+          sidebarLayout(
+            sidebarPanel(
+              # Text box to display all TAG_NUM values
+              textOutput("tag_values")
+            ),
+
+            mainPanel(
+              # Display table based on selection
+              DTOutput("table"),
+
+              # Download button
+              downloadButton("download_table", "Download Existing Recaptures Table")
+            )
+          )
+        )
+        })
+
+        # Define server logic
+
+          # Render unique TAG_NUM values in text box
+          output$tag_values <- renderText({
+            paste(unique(entered$TAG_ID), collapse = ", ")
+          })
+
+          # Render table based on selection
+          output$table <- renderDT({
+            datatable(entered)
+          })
+
+          # Download entire table
+          output$download_table <- downloadHandler(
+            filename = function() {
+              paste("existing_recaptures_table", ".csv", sep = "")
+            },
+            content = function(file) {
+              write.csv(entered, file, row.names = FALSE)
+            }
+          )
+
+
+      }else{
+        output$dynamicUI <- renderUI({
+          fluidPage(
+            h3("All recaptures uploaded successfully without errors! Close this window.")
+          ) })
+      }
+
+    }) ## observ event
+
+    } ## serv logic
+    # Run the application
+    return(shinyApp(ui = ui, server = server))
+  }
+
+  if(!return_error & !return_warning){
     ###### Database UPLOAD HERE. Check that entry doesn't already exist before uploading
 
     table_name <- "LBT_RECAPTURES"
@@ -781,7 +955,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       dbClearResult(check)
 
       if(nrow(existing_event)==0){
-        sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELCODE[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+        sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
         if(db %in% "local"){dbBegin(con)}
         result <- dbSendQuery(con, sql)
         dbCommit(con)
@@ -812,7 +986,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       ui <- fluidPage(
         titlePanel("Upload Success!"),
         tags$br(),
-        h4("Recaptures for the following tags on the same day were found already in the database, these are assumed to be the same event so were not uploaded:"),
+        h4("Recaptures for the following tags by the same person on the same day were found already in the database, these are assumed to be the same event so were not uploaded:"),
         sidebarLayout(
           sidebarPanel(
             # Text box to display all TAG_NUM values
@@ -824,7 +998,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
             DTOutput("table"),
 
             # Download button
-            downloadButton("download_table", "Download Table")
+            downloadButton("download_table", "Download Existing Recaptures Table")
           )
         )
       )
@@ -845,7 +1019,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
         # Download entire table
         output$download_table <- downloadHandler(
           filename = function() {
-            paste("entered_table", ".csv", sep = "")
+            paste("existing_recaptures_table", ".csv", sep = "")
           },
           content = function(file) {
             write.csv(entered, file, row.names = FALSE)

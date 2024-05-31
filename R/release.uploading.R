@@ -139,12 +139,14 @@ repeat_tags = which(duplicated(rel$TAG_ID)==TRUE)
 
 bad_lat = which(rel$LAT_DD %in% NA | nchar(as.character(rel$LAT_DD))<2 | !is.numeric(rel$LAT_DD))
 bad_lon = which(rel$LON_DD %in% NA | nchar(as.character(rel$LON_DD))<2 | !is.numeric(rel$LON_DD))
+sus_lon = which(rel$LON_DD>0) ## suspect longitudes not in the Western hemisphere
 bad_date = which(rel$REL_DATE %in% NA)
 
 
 error_out= ""
 error_tab = NULL
 return_error = FALSE
+return_warning = FALSE
 
 if(length(bad_tag_pre) > 0){
   for(i in bad_tag_pre){
@@ -188,11 +190,17 @@ if(length(bad_date) > 0){
   }
   return_error = TRUE
 }
+if(length(sus_lon)>0){
+  for(i in sus_lon){
+    error_out = paste(error_out, "\nSuspicious positive longitudes (should be negative for Western hemisphere) for tags:", rel$TAG_ID[i],"at row:",i)
+    error_tab = rbind(error_tab,c(i,rel$TAG_PREFIX[i],rel$TAG_NUM[i],"Suspicious positive longitude"))
+  }
+  return_warning = TRUE
+}
 
 if(return_error){
   colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Error")
 ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
-
   # Define the UI
   ui <- fluidPage(
     titlePanel("Uploading Errors"),
@@ -228,7 +236,152 @@ if(return_error){
   return(shinyApp(ui = ui, server = server))
 }
 
-if(!return_error){
+
+if(!return_error & return_warning){
+    colnames(error_tab)=c("Row","Tag Prefix","Tag Number","Warning")
+    ## Create interactive dialogue showing uploading errors and giving user option to download these in a table
+    # Define the UI
+    ui <- fluidPage(
+      titlePanel("Uploading Warnings"),
+      mainPanel(
+        uiOutput("dynamicUI")
+
+        )
+      )
+
+
+    # Define the server logic
+    server <- function(input, output) {
+      # Initial content in the main panel
+      output$dynamicUI <- renderUI({
+        h3("Check issues below before proceeding with upload:")
+      })
+      output$dynamicUI <- renderUI({
+        h4(verbatimTextOutput("text_output"),
+          # Button to download the table
+          downloadButton("download_table", label = "Download Warning Table"),
+          # Button to proceed with upload
+          actionButton(inputId = "upload_table", label = "Ignore Warnings and Upload Data")
+        )
+      })
+      # Display the text from the string variable
+      output$text_output <- renderText({
+        error_out
+      })
+
+      # Function to generate a downloadable file
+      output$download_table <- downloadHandler(
+        filename = function() {
+          "releases_uploading_warnings.csv"
+        },
+        content = function(file) {
+          write.csv(error_tab, file,row.names = F)
+        }
+      )
+
+      observeEvent(input$upload_table,{
+
+        ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
+
+        ### open db connection
+        if(db %in% "Oracle"){
+          tryCatch({
+            drv <- DBI::dbDriver("Oracle")
+            con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+          }, warning = function(w) {
+          }, error = function(e) {
+            return(toJSON("Connection failed"))
+          }, finally = {
+          })
+        }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+
+        ## check for already entered tags, then upload all new tag entries
+        entered =NULL
+        for(i in 1:nrow(rel)){
+          sql <- paste0("SELECT * FROM ",table_name," WHERE TAG_ID= '",rel$TAG_ID[i],"'")
+          check <- dbSendQuery(con, sql)
+          existing_tag <- dbFetch(check)
+          entered <- rbind(entered,existing_tag)
+          dbClearResult(check)
+
+          if(nrow(existing_tag)==0){
+            sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+            if(db %in% "local"){dbBegin(con)}
+            result <- dbSendQuery(con, sql)
+            dbCommit(con)
+            dbClearResult(result)
+          }
+
+        }
+
+        dbDisconnect(con)
+
+        ### show interactive info window if there were any tags found to be already entered
+        if(nrow(entered)>0){
+          # Dynamically render new UI elements
+          output$dynamicUI <- renderUI({
+            fluidPage(
+            tags$br(),
+            h3("Upload Success! The following tags already exist in the database so were not uploaded:"),
+            sidebarLayout(
+              sidebarPanel(
+                # Text box to display all TAG_NUM values
+                textOutput("tag_values")
+              ),
+
+              mainPanel(
+                # Display table based on selection
+                DTOutput("table"),
+
+                # Download button
+                downloadButton("download_table", "Download Table of Existing Tags")
+              )
+            )
+          )
+          })
+
+          # New server logic
+
+            # Render unique TAG_NUM values in text box
+
+            output$tag_values <- renderText({
+              paste(unique(entered$TAG_ID), collapse = ", ")
+            })
+
+            # Render table based on selection
+            output$table <- renderDT({
+              datatable(entered)
+            })
+
+            # Download entire table
+            output$download_table <- downloadHandler(
+              filename = function() {
+                paste("already_existing_tags", ".csv", sep = "")
+              },
+              content = function(file) {
+                write.csv(entered, file, row.names = FALSE)
+              }
+            )
+
+
+        }else{
+          output$dynamicUI <- renderUI({
+            fluidPage(
+            h3("All releases uploaded successfully! There were no errors and none of the tags were found to already exist. Close this window.")
+            ) })
+          }
+
+      })
+
+    }
+
+    # Create the Shiny app object
+    return(shinyApp(ui = ui, server = server))
+  }
+
+
+  if(!return_error & !return_warning){
+
   ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
   ### open db connection
@@ -282,7 +435,7 @@ if(!return_error){
         DTOutput("table"),
 
         # Download button
-        downloadButton("download_table", "Download Table")
+        downloadButton("download_table", "Download Table of Existing Tags")
       )
     )
   )
@@ -303,7 +456,7 @@ if(!return_error){
     # Download entire table
     output$download_table <- downloadHandler(
       filename = function() {
-        paste("entered_table", ".csv", sep = "")
+        paste("already_existing_tags", ".csv", sep = "")
       },
       content = function(file) {
         write.csv(entered, file, row.names = FALSE)
@@ -318,7 +471,10 @@ if(!return_error){
    dlg_message("All releases uploaded successfully! There were no errors and none of the tags were found to already exist.")
   }
 
-}
+  }
+
+
+
 #######  SCRAP
 # new.names= c("Vessel", "Captain", "Port", "MANAGEMENT_AREA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
 

@@ -4,13 +4,11 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(map.token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
-                          person=NULL, output.location = "C:/Users/ELEMENTG/Documents/Rsaves", all.people = FALSE,
-                          username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server){
+generate_maps <- function(map.token = mapbox.token, output.location = output.dir, people=NULL, all.people = FALSE,
+                          db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
+                          oracle.dbname = oracle.personal.server){
 
-  oracle.personal.user<<-username
-  oracle.personal.password<<-password
-  oracle.personal.server<<-dbname
+
 
   #### load large base map for inset
   ## Allow user to choose data file to upload or manually draw extent
@@ -25,32 +23,36 @@ generate_maps <- function(map.token = "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZm
   ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
   inset <- raster::projectRaster(inset,  crs = 4326)
 
+  ### open db connection
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      conn <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    conn <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
 
-  tryCatch({
-    drv <- DBI::dbDriver("Oracle")
-    conn <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
-  }, warning = function(w) {
-  }, error = function(e) {
-    return(toJSON("Connection failed"))
-  }, finally = {
-  })
 
 ## bring in paths
-sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_PATH")
+sql = paste0("SELECT * FROM LBT_PATH")
 path <- ROracle::dbSendQuery(conn, sql)
 path <- ROracle::fetch(path)
-sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_PATHS")
+sql = paste0("SELECT * FROM LBT_PATHS")
 paths <- ROracle::dbSendQuery(conn, sql)
 paths <- ROracle::fetch(paths)
 
 ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
 paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
 
-people = person
 if(all.people){
   ## get all names who've recaptured tags
-  sql = paste0("SELECT * FROM ",oracle.personal.user,".LBT_RECAPTURES")
+  sql = paste0("SELECT * FROM LBT_RECAPTURES")
   rec <- ROracle::dbSendQuery(conn, sql)
   rec <- ROracle::fetch(rec)
   people <- unique(rec$PERSON)
@@ -59,11 +61,12 @@ if(all.people){
 ##
 ROracle::dbDisconnect(conn)
 
+if(is.null(people)){base::message("No people or tags chosen to make maps for!")}
 ## loops if there's more than one person
 for (p in people){
   person = p
 
-if(is.null(person)){print("No person chosen to make maps for")}else{
+if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
   ### filter path data for tags recaptured by chosen person
   path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
@@ -189,7 +192,7 @@ if(is.null(person)){print("No person chosen to make maps for")}else{
     ## get labels
     rel.lab <- path.pers %>% filter(TID  %in% i) %>% summarise(TID = first(TID),DATE = first(REL_DATE),LAT = first(LAT), LON = first(LON))
     rel.lab <- rel.lab %>% mutate(name = paste("Tag:",TID,DATE))
-    rec.lab <- path.pers %>% filter(TID  %in% i, !REC_PERSON %in% "NA") %>% dplyr::select(TID,REC_DATE,LAT,LON,REC_PERSON)
+    rec.lab <- path.pers %>% filter(TID  %in% i, !REC_PERSON %in% c(NA,"NA")) %>% dplyr::select(TID,REC_DATE,LAT,LON,REC_PERSON)
     rec.lab <- rec.lab %>% mutate(name = ifelse(REC_PERSON %in% person,paste("You Captured:",REC_DATE),paste("Other Fisher Captured:",REC_DATE)))
 
     map.labs <- rbind(rel.lab %>% dplyr::select(TID,LAT,LON,name),rec.lab %>% dplyr::select(TID,LAT,LON,name))
