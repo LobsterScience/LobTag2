@@ -192,7 +192,7 @@ if(length(repath)>0){
     trans = NULL
     r = raster(depth.raster.path)
     mr = as.matrix(r)
-    mr[which(mr > -5000 & mr < 0)] = -1                       #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
+    mr[which(mr > -5000 & mr < -1)] = -1                       #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
     mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
     r = setValues(r, mr)
 
