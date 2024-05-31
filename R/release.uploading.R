@@ -87,12 +87,14 @@ releases$LATDDMM_MM = releases$LAT_DEGREES * 100 + releases$LAT_MINUTES
 releases$LAT_DD = releases$LAT_DEGREES + releases$LAT_MINUTES / 60
 ## account for negative longitudes
 for(i in 1:nrow(releases)){
-  if(releases$LON_DEGREES[i]<0){
+  if(!is.na(releases$LON_DEGREES[i]) & releases$LON_DEGREES[i]<0){
     releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 - releases$LON_MINUTES[i]
     releases$LON_DD[i] = releases$LON_DEGREES[i] - releases$LON_MINUTES[i] / 60
   }else{
+    if(!is.na(releases$LON_DEGREES[i])){
     releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 + releases$LON_MINUTES[i]
     releases$LON_DD[i] = releases$LON_DEGREES[i] + releases$LON_MINUTES[i] / 60
+    }
     }
 }
 
