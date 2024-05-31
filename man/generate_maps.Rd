@@ -5,14 +5,14 @@
 \title{generate_maps}
 \usage{
 generate_maps(
-  map.token =
-    "pk.eyJ1IjoiZWxlbWVudGpha2UiLCJhIjoiY2xxZmh2bGFiMHhyNTJqcHJ0cDBqcW83ZiJ9.mDd49ObNcNdG6MzH3yc2dw",
-  person = NULL,
-  output.location = "C:/Users/ELEMENTG/Documents/Rsaves",
+  map.token = mapbox.token,
+  output.location = output.dir,
+  people = NULL,
   all.people = FALSE,
-  username = oracle.personal.user,
-  password = oracle.personal.password,
-  dbname = oracle.personal.server
+  db = "local",
+  oracle.user = oracle.personal.user,
+  oracle.password = oracle.personal.password,
+  oracle.dbname = oracle.personal.server
 )
 }
 \description{

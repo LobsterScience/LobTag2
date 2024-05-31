@@ -5,9 +5,10 @@
 \title{delete_recaptures}
 \usage{
 delete_recaptures(
-  username = oracle.personal.user,
-  password = oracle.personal.password,
-  dbname = oracle.personal.server
+  db = "local",
+  oracle.user = oracle.personal.user,
+  oracle.password = oracle.personal.password,
+  oracle.dbname = oracle.personal.server
 )
 }
 \description{

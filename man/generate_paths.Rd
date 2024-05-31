@@ -5,9 +5,10 @@
 \title{generate_paths}
 \usage{
 generate_paths(
-  username = oracle.personal.user,
-  password = oracle.personal.password,
-  dbname = oracle.personal.server,
+  db = "local",
+  oracle.user = oracle.personal.user,
+  oracle.password = oracle.personal.password,
+  oracle.dbname = oracle.personal.server,
   tags = "all",
   depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"),
   neighborhood = 16,
