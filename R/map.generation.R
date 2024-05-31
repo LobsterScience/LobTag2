@@ -1,6 +1,6 @@
 
 #' @title generate_maps
-#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle DBI
+#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle DBI raster
 #' @description creates maps of tag movement for participants
 #' @export
 
