@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(map.token = mapbox.token, output.location = output.dir, people=NULL, all.people = FALSE,
+generate_maps <- function(people=NULL, all.people = FALSE, map.token = mapbox.token, output.location = output.dir,
                           db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
@@ -21,7 +21,7 @@ generate_maps <- function(map.token = mapbox.token, output.location = output.dir
   inset <- basemap_raster(ext) #### forces basemap crs to be in 3857
 
   ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
-  #inset <- raster::projectRaster(inset,  crs = 4326)
+  inset <- raster::projectRaster(inset,  crs = 4326)
 
   ### open db connection
   if(db %in% "Oracle"){
@@ -73,7 +73,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
   #### Make sf objects
   sf_points <- sf::st_as_sf(path.pers, coords = c("LON","LAT"))
-  sf::st_crs(sf_points) <- sf::st_crs(3857)  # EPSG code for WGS84
+  sf::st_crs(sf_points) <- sf::st_crs(4326)  # EPSG code for WGS84
   ##loop through tags to create path lines
   path_list <- list()
   for(j in unique(sf_points$TID)){
@@ -96,8 +96,8 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     ## subset path list for current tag
     tag.path <- path_list[i]
     path_sf <- tag.path[[1]]
-    path_sf <- sf::st_sfc(path_sf, crs=3857)
-    sf::st_crs(path_sf) <- 3857
+    path_sf <- sf::st_sfc(path_sf, crs=4326)
+    sf::st_crs(path_sf) <- 4326
 
     #### define and load small basemap for actual mapping background
     ### set plotting region by tag
@@ -163,9 +163,9 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
 
     ## get basemap
-    ext_sf <- sf::st_sfc(ext, crs = 3857)
+    ext_sf <- sf::st_sfc(ext, crs = 4326)
     ext_sf <- sf::st_sf(ext_sf)
-    sf::st_crs(ext_sf) <- 3857
+    sf::st_crs(ext_sf) <- 4326
 
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
                  map_token = map.token)
@@ -173,7 +173,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     base <- basemap_raster(ext_sf) #### forces basemap crs to be in 3857
 
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
-    #base <- raster::projectRaster(base,  crs = 4326)
+    base <- raster::projectRaster(base,  crs = 4326)
 
     ## get dimensions information of base and inset for graph placement
     limits <- sf::st_bbox(base)
@@ -198,10 +198,10 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     map.labs <- rbind(rel.lab %>% dplyr::select(TID,LAT,LON,name),rec.lab %>% dplyr::select(TID,LAT,LON,name))
 
     labs.sf <- sf::st_as_sf(map.labs, coords = c("LON","LAT"))
-    sf::st_crs(labs.sf) <- sf::st_crs(3857)
+    sf::st_crs(labs.sf) <- sf::st_crs(4326)
 
 
-    a <- gg_raster(base)+
+    a <- gg_raster(base, r_type = "")+
       ggtitle(paste(person,"-",i))+
       geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
       geom_sf(data=labs.sf, colour = "yellow")+
@@ -211,7 +211,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
 
     #### make inset with NS map
-    b <- gg_raster(inset)+
+    b <- gg_raster(inset,r_type = "")+
       geom_sf(data = ext, colour = "red", alpha = 0.1)+
       coord_sf(expand = F)+
       theme(axis.title = element_blank(),
