@@ -80,7 +80,7 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
   # Close the connection
   dbDisconnect(con)
 #################################################################################################################################################
-
+  base::message("Generating paths... This may take a while if you have many recaptures!")
   ## make table with all recaptures and their release information
   recheck=TRUE
 while(recheck){

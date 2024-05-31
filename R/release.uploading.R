@@ -82,18 +82,39 @@ file_path <- dlg_open(filter = dlg_filters["csv",])$res
 releases <- read.csv(file_path, na.strings = "")
 ## Process / standardize the data table
 
-##decimal degrees and degrees minutes formatting done here
-releases$LATDDMM_MM = releases$LAT_DEGREES * 100 + releases$LAT_MINUTES
-releases$LAT_DD = releases$LAT_DEGREES + releases$LAT_MINUTES / 60
-## account for negative longitudes
+##ccordinate decimal degrees and degrees minutes formatting done here
+## account for negative degrees
+releases$LAT_DEGREES = as.numeric(releases$LAT_DEGREES)
+releases$LAT_MINUTES = as.numeric(releases$LAT_MINUTES)
+releases$LON_DEGREES = as.numeric(releases$LON_DEGREES)
+releases$LON_MINUTES = as.numeric(releases$LON_MINUTES)
+
+releases$LATDDMM_MM = NA
+releases$LAT_DD = NA
 for(i in 1:nrow(releases)){
-  if(!is.na(releases$LON_DEGREES[i]) & releases$LON_DEGREES[i]<0){
-    releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 - releases$LON_MINUTES[i]
-    releases$LON_DD[i] = releases$LON_DEGREES[i] - releases$LON_MINUTES[i] / 60
-  }else{
-    if(!is.na(releases$LON_DEGREES[i])){
-    releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 + releases$LON_MINUTES[i]
-    releases$LON_DD[i] = releases$LON_DEGREES[i] + releases$LON_MINUTES[i] / 60
+  if(!is.na(releases$LAT_DEGREES[i]) & !is.na(releases$LAT_MINUTES[i]) & is.numeric(releases$LAT_DEGREES[i]) &
+     is.numeric(releases$LAT_MINUTES[i])){
+    if(releases$LAT_DEGREES[i]<0){
+      releases$LATDDMM_MM[i] = releases$LAT_DEGREES[i] * 100 - releases$LAT_MINUTES[i]
+      releases$LAT_DD[i] = releases$LAT_DEGREES[i] - releases$LAT_MINUTES[i] / 60
+    }else{
+      releases$LATDDMM_MM[i] = releases$LAT_DEGREES[i] * 100 + releases$LAT_MINUTES[i]
+      releases$LAT_DD[i] = releases$LAT_DEGREES[i] + releases$LAT_MINUTES[i] / 60
+    }
+  }
+}
+
+releases$LONDDMM_MM = NA
+releases$LON_DD = NA
+for(i in 1:nrow(releases)){
+  if(!is.na(releases$LON_DEGREES[i]) & !is.na(releases$LON_MINUTES[i]) & is.numeric(releases$LON_DEGREES[i]) &
+     is.numeric(releases$LON_MINUTES[i])){
+    if(releases$LON_DEGREES[i]<0){
+      releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 - releases$LON_MINUTES[i]
+      releases$LON_DD[i] = releases$LON_DEGREES[i] - releases$LON_MINUTES[i] / 60
+    }else{
+      releases$LONDDMM_MM[i] = releases$LON_DEGREES[i] * 100 + releases$LON_MINUTES[i]
+      releases$LON_DD[i] = releases$LON_DEGREES[i] + releases$LON_MINUTES[i] / 60
     }
     }
 }

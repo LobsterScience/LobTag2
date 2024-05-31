@@ -616,7 +616,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   ## Allow user to choose data file to upload
   dlg_message("In the following window, choose a csv file containing your recaptures data")
   file_path <- dlg_open(filter = dlg_filters["csv",])$res
-  recaptures <- read.csv(file_path)
+  recaptures <- read.csv(file_path, na.strings = "")
   rec <- recaptures
   ## Process / standardize the data table
 
@@ -630,24 +630,54 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   # rec[2,11] =-34.456
   # rec <- rbind(rec,rec[1,])
 
-  ## check what coordinate is provided and autofill if necessary
-  for (i in 1:nrow(rec)){
+  ## some pre-coordinate formatting error checking
+  bad_lat.deg = which(!is.na(rec$LAT_DEGREE) & (nchar(as.character(rec$LAT_DEGREE))<2 | as.numeric(rec$LAT_DEGREE) %in% NA) ) ## these error check degrees and minutes, regardless of whether they get used to generate DD coordinates
+  bad_lat.min = which(!is.na(rec$LAT_MINUTE) & (nchar(as.character(rec$LAT_MINUTE))<2 | as.numeric(rec$LAT_MINUTE) %in% NA) )
+  bad_lon.deg = which(!is.na(rec$LON_DEGREE) & (nchar(as.character(rec$LON_DEGREE))<2 | as.numeric(rec$LON_DEGREE) %in% NA) )
+  bad_lon.min = which(!is.na(rec$LON_MINUTE) & (nchar(as.character(rec$LON_MINUTE))<2 | as.numeric(rec$LON_MINUTE) %in% NA) )
 
+  ##ccordinate decimal degrees and degrees minutes formatting done here
+  ## account for negative degrees
+  rec$LAT_DEGREE = as.numeric(rec$LAT_DEGREE)
+  rec$LAT_MINUTE = as.numeric(rec$LAT_MINUTE)
+  rec$LON_DEGREE = as.numeric(rec$LON_DEGREE)
+  rec$LON_MINUTE = as.numeric(rec$LON_MINUTE)
+  rec$LAT_DD = as.numeric(rec$LAT_DD)
+  rec$LON_DD = as.numeric(rec$LON_DD)
+## ultimately will use DD format for error checking, can back fill DEgree nd Minute columns from this if they're missing
+  ## latitude
+
+  for(i in 1:nrow(rec)){
     if(is.na(rec$LAT_DD[i])){
-      if(!is.na(rec$LAT_MINUTE[i]) & rec$LAT_MINUTE[i]<0){rec$LAT_MINUTE[i]=rec$LAT_MINUTE[i]*(-1)}
-      if(!is.na(rec$LAT_DEGREE[i]) & rec$LAT_DEGREE[i]<0){
-        rec$LAT_DD[i] = rec$LAT_DEGREE[i] - rec$LAT_MINUTE[i]/60
-      }else{rec$LAT_DD[i] = rec$LAT_DEGREE[i] + rec$LAT_MINUTE[i]/60}
-    }
-
-    if(is.na(rec$LON_DD[i])){
-      if(rec$LON_MINUTE[i]<0){rec$LON_MINUTE[i]=rec$LON_MINUTE[i]*(-1)}
-      if(rec$LON_DEGREE[i]<0){
-        rec$LON_DD[i] = rec$LON_DEGREE[i] - rec$LON_MINUTE[i]/60
-      }else{rec$LON_DD[i] = rec$LON_DEGREE[i] + rec$LON_MINUTE[i]/60}
+      if(!is.na(rec$LAT_DEGREE[i]) & !is.na(rec$LAT_MINUTE[i]) & is.numeric(rec$LAT_DEGREE[i]) &
+         is.numeric(rec$LAT_MINUTE[i])){
+        if(rec$LAT_DEGREE[i]<0){
+        #  rec$LATDDMM_MM[i] = rec$LAT_DEGREE[i] * 100 - rec$LAT_MINUTE[i]
+          rec$LAT_DD[i] = rec$LAT_DEGREE[i] - rec$LAT_MINUTE[i] / 60
+        }else{
+        #  rec$LATDDMM_MM[i] = rec$LAT_DEGREE[i] * 100 + rec$LAT_MINUTE[i]
+          rec$LAT_DD[i] = rec$LAT_DEGREE[i] + rec$LAT_MINUTE[i] / 60
+        }
+      }
     }
 
   }
+  ## longitude
+  for(i in 1:nrow(rec)){
+    if(is.na(rec$LON_DD[i])){
+      if(!is.na(rec$LON_DEGREE[i]) & !is.na(rec$LON_MINUTE[i]) & is.numeric(rec$LON_DEGREE[i]) &
+         is.numeric(rec$LON_MINUTE[i])){
+        if(rec$LON_DEGREE[i]<0){
+         # rec$LONDDMM_MM[i] = rec$LON_DEGREE[i] * 100 - rec$LON_MINUTE[i]
+          rec$LON_DD[i] = rec$LON_DEGREE[i] - rec$LON_MINUTE[i] / 60
+        }else{
+         # rec$LONDDMM_MM[i] = rec$LON_DEGREE[i] * 100 + rec$LON_MINUTE[i]
+          rec$LON_DD[i] = rec$LON_DEGREE[i] + rec$LON_MINUTE[i] / 60
+        }
+      }
+    }
+  }
+
 
   rec <- rec %>% mutate(TAG_ID = paste0(TAG_PREFIX,as.character(TAG_NUMBER)))
   rec <- rec %>% mutate(REC_DATE = paste(DAY,MONTH,YEAR, sep="/"))
@@ -702,6 +732,34 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     for(i in bad_lon){
       error_out = paste(error_out, "\nBad or missing longitude for tag:",rec$TAG_ID[i],"at row:",i)
       error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad or missing longitude"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lat.deg) > 0){
+    for(i in bad_lat.deg){
+      error_out = paste(error_out, "\nBad latitude degrees for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad latitude degrees"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lat.min) > 0){
+    for(i in bad_lat.min){
+      error_out = paste(error_out, "\nBad latitude minutes for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad latitude minutes"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lon.deg) > 0){
+    for(i in bad_lon.deg){
+      error_out = paste(error_out, "\nBad longitude degrees for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad longitude degrees"))
+    }
+    return_error = TRUE
+  }
+  if(length(bad_lon.min) > 0){
+    for(i in bad_lon.min){
+      error_out = paste(error_out, "\nBad longitude minutes for tag:",rec$TAG_ID[i],"at row:",i)
+      error_tab = rbind(error_tab,c(i,rec$TAG_PREFIX[i],rec$TAG_NUMBER[i],"Bad longitude minutes"))
     }
     return_error = TRUE
   }
