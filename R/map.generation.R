@@ -1,6 +1,6 @@
 
 #' @title generate_maps
-#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle DBI raster
+#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle RSQLite DBI raster
 #' @description creates maps of tag movement for participants
 #' @export
 
@@ -23,9 +23,9 @@ generate_maps <- function(people=NULL, all.people = FALSE, map.token = mapbox.to
   set_defaults(ext, map_service = "mapbox",map_type = "satellite",
                map_token = map.token)
 
-  inset <- basemap_raster(ext) #### forces basemap crs to be in 3857
+  inset <- basemap_raster(ext, map_res = 0.1) #### mapbox's default datum is mercator (3857)
 
-  ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
+  ## reproject raster to change back to 4326, this can cause some colour problems when graphing later (raster package has some masking issues with sf, so just use ::)
   inset <- raster::projectRaster(inset,  crs = 4326)
 
   ### open db connection
@@ -205,24 +205,63 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     labs.sf <- sf::st_as_sf(map.labs, coords = c("LON","LAT"))
     sf::st_crs(labs.sf) <- sf::st_crs(4326)
 
+    ## graphing
+    ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
 
-    a <- gg_raster(base, r_type = "")+
-      ggtitle(paste(person,"-",i))+
-      geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
-      geom_sf(data=labs.sf, colour = "yellow")+
-      geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
-      coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-      theme(plot.margin = margin(t = 73))
+    ## function to normalize the colour values of a reprojected raster brick object for graphing with with gg_raster or other raster graphing functions
+    normalize_raster_brick <- function(raster_brick) {
+      # Ensure the input is a raster brick
+      if (!inherits(raster_brick, "RasterBrick")) {
+        stop("The input must be a RasterBrick object.")
+      }
+
+      # Extract the individual bands
+      red_band <- raster_brick[[1]]
+      green_band <- raster_brick[[2]]
+      blue_band <- raster_brick[[3]]
+
+      # Get the values from each band
+      red_values <- raster::getValues(red_band)
+      green_values <- raster::getValues(green_band)
+      blue_values <- raster::getValues(blue_band)
+
+      # Normalize the values to the range [0, 1]
+      red_values_normalized <- (red_values - min(red_values, na.rm = TRUE)) / (max(red_values, na.rm = TRUE) - min(red_values, na.rm = TRUE))
+      green_values_normalized <- (green_values - min(green_values, na.rm = TRUE)) / (max(green_values, na.rm = TRUE) - min(green_values, na.rm = TRUE))
+      blue_values_normalized <- (blue_values - min(blue_values, na.rm = TRUE)) / (max(blue_values, na.rm = TRUE) - min(blue_values, na.rm = TRUE))
+
+      # Replace the original values in the bands with the normalized values
+      values(red_band) <- red_values_normalized
+      values(green_band) <- green_values_normalized
+      values(blue_band) <- blue_values_normalized
+
+      # Combine the normalized bands back into a raster brick
+      normalized_raster_brick <- brick(red_band, green_band, blue_band)
+
+      return(normalized_raster_brick)
+    }
+
+    ## main map
+      base <- normalize_raster_brick(base)
+      a <- gg_raster(base, maxpixels=400000)+
+        ggtitle(paste(person,"-",i))+
+        geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
+        geom_sf(data=labs.sf, colour = "yellow")+
+        geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))
 
 
-    #### make inset with NS map
-    b <- gg_raster(inset,r_type = "")+
-      geom_sf(data = ext, colour = "red", alpha = 0.1)+
-      coord_sf(expand = F)+
-      theme(axis.title = element_blank(),
-            axis.text  = element_blank(),
-            axis.ticks = element_blank(),
-            plot.margin = unit(c(0.2,0.1,0.0,0.0),'lines'))
+    ## inset map
+      inset <- normalize_raster_brick(inset)
+      b <- gg_raster(inset, maxpixels=50000)+
+        geom_sf(data = ext, colour = "red", alpha = 0.1)+
+        coord_sf(expand = F)+
+        theme(axis.title = element_blank(),
+              axis.text  = element_blank(),
+              axis.ticks = element_blank(),
+              plot.margin = unit(c(0.2,0.1,0.0,0.0),'lines'))
+
 
     b1 <- ggplotGrob(b)
 
@@ -251,45 +290,10 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
 
 
-#library(raster)
 
-normalize_raster_brick <- function(raster_brick) {
-  # Ensure the input is a raster brick
-  if (!inherits(raster_brick, "RasterBrick")) {
-    stop("The input must be a RasterBrick object.")
-  }
 
-  # Extract the individual bands
-  red_band <- raster_brick[[1]]
-  green_band <- raster_brick[[2]]
-  blue_band <- raster_brick[[3]]
 
-  # Get the values from each band
-  red_values <- raster::getValues(red_band)
-  green_values <- raster::getValues(green_band)
-  blue_values <- raster::getValues(blue_band)
 
-  # Normalize the values to the range [0, 1]
-  red_values_normalized <- (red_values - min(red_values, na.rm = TRUE)) / (max(red_values, na.rm = TRUE) - min(red_values, na.rm = TRUE))
-  green_values_normalized <- (green_values - min(green_values, na.rm = TRUE)) / (max(green_values, na.rm = TRUE) - min(green_values, na.rm = TRUE))
-  blue_values_normalized <- (blue_values - min(blue_values, na.rm = TRUE)) / (max(blue_values, na.rm = TRUE) - min(blue_values, na.rm = TRUE))
 
-  # Replace the original values in the bands with the normalized values
-  values(red_band) <- red_values_normalized
-  values(green_band) <- green_values_normalized
-  values(blue_band) <- blue_values_normalized
 
-  # Combine the normalized bands back into a raster brick
-  normalized_raster_brick <- brick(red_band, green_band, blue_band)
-
-  return(normalized_raster_brick)
-}
-
-# Example usage
-# Assuming you have a raster brick object named 'inset'
-# inset <- brick("path_to_your_raster_file.tif")
-# normalized_inset <- normalize_raster_brick(inset)
-
-# Now you can use the normalized raster brick with gg_raster or any other function
-# gg_raster(normalized_inset)
 

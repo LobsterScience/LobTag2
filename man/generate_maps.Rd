@@ -5,11 +5,11 @@
 \title{generate_maps}
 \usage{
 generate_maps(
-  map.token = mapbox.token,
-  output.location = output.dir,
   people = NULL,
   all.people = FALSE,
+  map.token = mapbox.token,
   db = "local",
+  output.location = NULL,
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,
   oracle.dbname = oracle.personal.server
