@@ -148,7 +148,7 @@ delete_recaptures <- function(db = "local", oracle.user = oracle.personal.user, 
       # regenerate paths
       regen_needed <- check.regen(tag_prefix, tag_number, con)
       if(regen_needed){
-        update_message("There are other recaptures for this tag! Regenerating paths for this tag, please wait ...     DO NOT CLOSE THIS WINDOW!",color = "red")
+        update_message("There are other recaptures for this tag! Regenerating paths for this tag, please wait ... this may take a while.    DO NOT CLOSE THIS WINDOW!",color = "red")
         print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
         # Introduce a delay before executing the function
         delay(10,
