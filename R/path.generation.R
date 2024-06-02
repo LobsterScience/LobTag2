@@ -107,6 +107,14 @@ while(recheck){
   releases <- ROracle::dbSendQuery(con, query)
   releases <- ROracle::fetch(releases)
 
+  ## deal with recaptures that have no person name
+  recaptures <- recaptures %>% mutate(PERSON = ifelse(PERSON %in% "",NA,PERSON))
+  for(i in 1:nrow(recaptures)){
+    if(is.na(recaptures$PERSON[i])){
+      recaptures$PERSON[i] = paste0("Fisher ",i)
+      }
+    }
+
   ## filter back so that only recaptures that have releases are pathed. Warn user about any recaptures that don't have releases
   if(!(length(unique(recaptures$TAG_ID))==length(unique(releases$TAG_ID)))){
     base::message("WARNING! There are recaptured tags that don't have initial release coordinates! Only pathing tags that have release data.")
@@ -139,7 +147,7 @@ while(recheck){
     d <- unique(tab$REC_DATE)
     p.tab <- pdat[pathed,] %>% filter(TAG_ID %in% i)
     earlier <- any(tab$REC_DATE<max(p.tab$REC_DATE))
-    if(earlier){repath=c(delete,i)}
+    if(earlier){repath=c(repath,i)}
   }
 if(length(repath)>0){
   base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")

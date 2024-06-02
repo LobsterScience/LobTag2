@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(people=NULL, all.people = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
+generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
                           oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
@@ -62,18 +62,30 @@ if(all.people){
   rec <- ROracle::fetch(rec)
   people <- unique(rec$PERSON)
 }
+if(all.tags){
+  ## get all names who've recaptured tags
+  sql = paste0("SELECT * FROM LBT_RECAPTURES")
+  rec <- ROracle::dbSendQuery(conn, sql)
+  rec <- ROracle::fetch(rec)
+  tags <- unique(rec$TAG_ID)
+}
 
 ##
 ROracle::dbDisconnect(conn)
 
-if(is.null(people)){base::message("No people or tags chosen to make maps for!")}
+if(!is.null(tags)){
+  paths <- paths %>% filter(TID %in% tags)
+  people <- unique((paths %>% filter(!REC_PERSON %in% NA))$REC_PERSON)
+}
+
+if(is.null(people) & is.null(tags)){base::message("No tags or people chosen to make maps for!")}
 ## loops if there's more than one person
 for (p in people){
   person = p
 
 if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
-  ### filter path data for tags recaptured by chosen person
+  ### filter path data for chosen tags or tags recaptured by chosen person
   path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
 
   #### Make sf objects
