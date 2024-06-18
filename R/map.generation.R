@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
+generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
                           oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
@@ -15,18 +15,8 @@ generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags
   }
 
 
-  #### load large base map for inset
-  ## Allow user to choose data file to upload or manually draw extent
-  result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the default basemap will be used")
-  if(result$res %in% "yes"){ext <- draw_ext()}else{ext <- readRDS(system.file("data", "NS_extent", package = "LobTag2"))}
-
-  set_defaults(ext, map_service = "mapbox",map_type = "satellite",
-               map_token = map.token)
-
-  inset <- basemap_raster(ext, map_res = 0.1) #### mapbox's default datum is mercator (3857)
-
-  ## reproject raster to change back to 4326, this can cause some colour problems when graphing later (raster package has some masking issues with sf, so just use ::)
-  inset <- raster::projectRaster(inset,  crs = 4326)
+  ## Allow user to choose whether or not to manually draw inset map
+  result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
 
   ### open db connection
   if(db %in% "Oracle"){
@@ -73,12 +63,12 @@ if(all.tags){
 ##
 ROracle::dbDisconnect(conn)
 
-if(!is.null(tags)){
-  paths <- paths %>% filter(TID %in% tags)
+if(!is.null(tag.IDs)){
+  paths <- paths %>% filter(TID %in% tag.IDs)
   people <- unique((paths %>% filter(!REC_PERSON %in% NA))$REC_PERSON)
 }
 
-if(is.null(people) & is.null(tags)){base::message("No tags or people chosen to make maps for!")}
+if(is.null(people) & is.null(tag.IDs)){base::message("No tags or people chosen to make maps for!")}
 ## loops if there's more than one person
 for (p in people){
   person = p
@@ -167,17 +157,15 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
     ## If just one point, set box size
     if(maxx == minx & maxy == miny){
-      left = minx - 0.1
-      right = maxx + 0.1
-      top = maxy + 0.07
-      bottom = miny - 0.07
+      minx = minx - 0.1
+      maxx = maxx + 0.1
+      maxy = maxy + 0.07
+      miny = miny - 0.07
 
-      ylen = top-bottom
-      xlen = right-left
-
-      ext <- sf::st_polygon(list(matrix(c(left,bottom,right,bottom,right,top,left,top,left,bottom),ncol = 2, byrow = T)))
-    }else{ ext <- sf::st_polygon(list(matrix(c(minx,miny,maxx,miny,maxx,maxy,minx,maxy,minx,miny),ncol = 2, byrow = T))) }
-
+      ylen = maxy-miny
+      xlen = maxx-minx
+    }
+    ext <- sf::st_polygon(list(matrix(c(minx,miny,maxx,miny,maxx,maxy,minx,maxy,minx,miny),ncol = 2, byrow = T)))
 
     ## get basemap
     ext_sf <- sf::st_sfc(ext, crs = 4326)
@@ -191,6 +179,27 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
     base <- raster::projectRaster(base,  crs = 4326)
+
+    ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
+    if(result$res %in% "yes"){ext.inset <- draw_ext()}else{
+
+      expand = 5
+      ## if the mapping area is very small, keep increasing expand factor until inset size is meaningful (at least about 2 degrees of longitude)
+      while(((maxx+(xlen*expand))-(minx-(xlen*expand)))<1.9){expand = expand+0.1}
+
+      ext.inset <- sf::st_polygon(list(matrix(c(minx-(xlen*expand),miny-(ylen*expand),maxx+(xlen*expand),miny-(ylen*expand),maxx+(xlen*expand),maxy+(ylen*expand),minx-(xlen*expand),maxy+(ylen*expand),minx-(xlen*expand),miny-(ylen*expand)),ncol = 2, byrow = T)))
+      ext.inset_sf <- sf::st_sfc(ext.inset, crs = 4326)
+      ext.inset_sf <- sf::st_sf(ext.inset_sf)
+      sf::st_crs(ext.inset_sf) <- 4326
+      }
+
+    set_defaults(ext.inset, map_service = "mapbox",map_type = "satellite",
+                 map_token = map.token)
+
+    inset <- basemap_raster(ext.inset_sf, map_res = 0.9) #### mapbox's default datum is mercator (3857)
+
+    ## reproject raster to change back to 4326, this can cause some colour problems when graphing later (raster package has some masking issues with sf, so just use ::)
+    inset <- raster::projectRaster(inset,  crs = 4326)
 
     ## get dimensions information of base and inset for graph placement
     limits <- sf::st_bbox(base)
@@ -266,7 +275,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
     ## inset map
       inset <- normalize_raster_brick(inset)
-      b <- gg_raster(inset, maxpixels=50000)+
+      b <- gg_raster(inset, maxpixels=300000)+
         geom_sf(data = ext, colour = "red", alpha = 0.1)+
         coord_sf(expand = F)+
         theme(axis.title = element_blank(),
