@@ -5,6 +5,7 @@
 
 upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
+
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
     pkg <- "ROracle"
