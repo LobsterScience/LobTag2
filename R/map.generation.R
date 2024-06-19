@@ -54,11 +54,11 @@ generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.t
 
 ## bring in paths
 sql = paste0("SELECT * FROM LBT_PATH")
-path <- ROracle::dbSendQuery(conn, sql)
-path <- ROracle::fetch(path)
+path <- dbSendQuery(conn, sql)
+path <- fetch(path)
 sql = paste0("SELECT * FROM LBT_PATHS")
-paths <- ROracle::dbSendQuery(conn, sql)
-paths <- ROracle::fetch(paths)
+paths <- dbSendQuery(conn, sql)
+paths <- fetch(paths)
 
 ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
 paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
@@ -66,20 +66,20 @@ paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
 if(all.people){
   ## get all names who've recaptured tags
   sql = paste0("SELECT * FROM LBT_RECAPTURES")
-  rec <- ROracle::dbSendQuery(conn, sql)
-  rec <- ROracle::fetch(rec)
+  rec <- dbSendQuery(conn, sql)
+  rec <- fetch(rec)
   people <- unique(rec$PERSON)
 }
 if(all.tags){
   ## get all names who've recaptured tags
   sql = paste0("SELECT * FROM LBT_RECAPTURES")
-  rec <- ROracle::dbSendQuery(conn, sql)
-  rec <- ROracle::fetch(rec)
+  rec <- dbSendQuery(conn, sql)
+  rec <- fetch(rec)
   tags <- unique(rec$TAG_ID)
 }
 
 ##
-ROracle::dbDisconnect(conn)
+dbDisconnect(conn)
 
 if(!is.null(tag.IDs)){
   paths <- paths %>% filter(TID %in% tag.IDs)

@@ -74,8 +74,8 @@ delete_recaptures <- function(db = "local", oracle.user = oracle.personal.user, 
   check.regen <- function(tag_prefix, tag_number,con){
     ## check if other recaptures still exist for this tag (re-pathing necessary)
     q.check <- paste0("SELECT * FROM LBT_RECAPTURES WHERE TAG_PREFIX = '", tag_prefix, "' AND TAG_NUMBER = '", tag_number,"'")
-    check <- ROracle::dbSendQuery(con, q.check)
-    check <- ROracle::fetch(check)
+    check <- dbSendQuery(con, q.check)
+    check <- fetch(check)
     ## regenerate paths for deleted tag if other recaptures exist
     if(nrow(check)>0){
       regen=TRUE

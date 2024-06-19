@@ -28,7 +28,7 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
   if(db %in% "Oracle"){
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
     }, warning = function(w) {
     }, error = function(e) {
       return(toJSON("Connection failed"))
@@ -108,7 +108,7 @@ while(recheck){
   if(db %in% "Oracle"){
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
     }, warning = function(w) {
     }, error = function(e) {
       return(toJSON("Connection failed"))
@@ -119,13 +119,13 @@ while(recheck){
   }
 
   query = paste0("SELECT * FROM LBT_RECAPTURES")
-  recaptures <- ROracle::dbSendQuery(con, query)
-  recaptures <- ROracle::fetch(recaptures)
+  recaptures <- dbSendQuery(con, query)
+  recaptures <- fetch(recaptures)
 
   cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
   query = paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID in ",cap.samps)
-  releases <- ROracle::dbSendQuery(con, query)
-  releases <- ROracle::fetch(releases)
+  releases <- dbSendQuery(con, query)
+  releases <- fetch(releases)
 
   ## deal with recaptures that have no person name
   recaptures <- recaptures %>% mutate(PERSON = ifelse(PERSON %in% "",NA,PERSON))
@@ -148,9 +148,9 @@ while(recheck){
   pdat <- left_join(rec.prep,rel.prep)
 
   ## find tags that have not yet been pathed
-  dat <- ROracle::dbSendQuery(con, paste0("SELECT * FROM LBT_PATH"))
-  dat <-  ROracle::fetch(dat)
-  ROracle::dbDisconnect(con)
+  dat <- dbSendQuery(con, paste0("SELECT * FROM LBT_PATH"))
+  dat <-  fetch(dat)
+  dbDisconnect(con)
 
   ## for selected tag:
   if(!(tags %in% "all")){
@@ -174,7 +174,7 @@ if(length(repath)>0){
   if(db %in% "Oracle"){
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
     }, warning = function(w) {
     }, error = function(e) {
       return(toJSON("Connection failed"))
@@ -198,7 +198,7 @@ if(length(repath)>0){
     dbCommit(con)
 
   }
-  ROracle::dbDisconnect(con)
+  dbDisconnect(con)
   ## if recheck is true, start back over and re-query the database with bad paths removed
   recheck=TRUE
   }else{recheck=FALSE}
@@ -312,7 +312,7 @@ if(length(repath)>0){
     if(db %in% "Oracle"){
       tryCatch({
         drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+        con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
       }, warning = function(w) {
       }, error = function(e) {
         return(toJSON("Connection failed"))
@@ -330,10 +330,10 @@ if(length(repath)>0){
         path_call = create_sql_query(pathdb, df2towrite)
         paths_call = create_sql_query(pathsdb, dxtowrite)
 
-        result <- ROracle::dbSendQuery(con, path_call)
-        result <- ROracle::dbSendQuery(con, paths_call)
+        result <- dbSendQuery(con, path_call)
+        result <- dbSendQuery(con, paths_call)
 
-        ROracle::dbCommit(con)
+        dbCommit(con)
 
         print("New paths calculated and written to path tables.")
 
@@ -343,7 +343,7 @@ if(length(repath)>0){
         print("New paths calculated and written to paths tables.")
         }
 
-    ROracle::dbDisconnect(con)
+    dbDisconnect(con)
   }else{
     print("No new paths created.")  }
 
