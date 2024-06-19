@@ -1,10 +1,27 @@
 
 #' @title delete_recaptures
-#' @import dplyr ROracle DBI shiny shinyjs
+#' @import dplyr RSQLite DBI shiny shinyjs
 #' @description allows user to delete chosen tag recaptures and associated paths
 #' @export
 
 delete_recaptures <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    pkg <- "ROracle"
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      # If not installed, install the package
+      install.packages(pkg)
+
+      # Load the package after installing
+      library(pkg, character.only = TRUE)
+    } else {
+      # If already installed, just load the package
+      library(pkg, character.only = TRUE)
+    }
+  }
+####################################################### Main Function:
+
 
   # Function to check if the recapture exists
   check_recapture <- function(tag_prefix, tag_number, date_caught, con) {

@@ -1,11 +1,28 @@
 #' @title upload_releases
-#' @import dplyr ROracle RSQLite DBI shiny DT svDialogs
+#' @import dplyr RSQLite DBI shiny DT svDialogs
 #' @description batch uploads tag release data
 #' @export
 
 upload_releases <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+  pkg <- "ROracle"
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    # If not installed, install the package
+    install.packages(pkg)
 
+    # Load the package after installing
+    library(pkg, character.only = TRUE)
+  } else {
+    # If already installed, just load the package
+    library(pkg, character.only = TRUE)
+    }
+  }
+  #######################################################
+
+  ##################################################################################################
+  ##################################################################################################
   # Check if releases table already exists and create if not
 if(db %in% "Oracle"){
   tryCatch({
@@ -75,6 +92,7 @@ if(db %in% "Oracle"){
   dbDisconnect(con)
 
 ####################################################################################################
+###################################################################### MAIN FUNCTION:
 
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose a csv file containing your releases data")

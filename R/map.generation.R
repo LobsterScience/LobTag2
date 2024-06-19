@@ -1,12 +1,30 @@
 
 #' @title generate_maps
-#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs ROracle RSQLite DBI raster
+#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs RSQLite DBI raster
 #' @description creates maps of tag movement for participants
 #' @export
 
 generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
                           oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
+
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    pkg <- "ROracle"
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      # If not installed, install the package
+      install.packages(pkg)
+
+      # Load the package after installing
+      library(pkg, character.only = TRUE)
+    } else {
+      # If already installed, just load the package
+      library(pkg, character.only = TRUE)
+    }
+  }
+####################################################### Main Function:
+
+
 
   ## let user select output file location for maps
   if(is.null(output.location)){

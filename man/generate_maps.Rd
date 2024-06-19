@@ -7,6 +7,8 @@
 generate_maps(
   people = NULL,
   all.people = FALSE,
+  tag.IDs = NULL,
+  all.tags = FALSE,
   map.token = mapbox.token,
   db = "local",
   output.location = NULL,

@@ -1,10 +1,28 @@
 #' @title upload_recaptures
-#' @import dplyr ROracle DBI shiny shinyjs svDialogs
+#' @import dplyr RSQLite DBI shiny shinyjs svDialogs
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
 upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    pkg <- "ROracle"
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      # If not installed, install the package
+      install.packages(pkg)
+
+      # Load the package after installing
+      library(pkg, character.only = TRUE)
+    } else {
+      # If already installed, just load the package
+      library(pkg, character.only = TRUE)
+    }
+  }
+  #######################################################
+
+  #####################################################################################################
+  #####################################################################################################
   ## Check if recaptures and people tables already exist and create if not
 
   ### open db connection
@@ -99,7 +117,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
     dbDisconnect(con)
 
 ####################################################################################################
-
+######################################################################## Main Function:
   # Define UI for application
   ui <- fluidPage(
 

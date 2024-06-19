@@ -1,10 +1,28 @@
 #' @title generate_paths
-#' @import dplyr raster gdistance PBSmapping
+#' @import dplyr RSQLite raster gdistance PBSmapping
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
 generate_paths <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost"){
 
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    pkg <- "ROracle"
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      # If not installed, install the package
+      install.packages(pkg)
+
+      # Load the package after installing
+      library(pkg, character.only = TRUE)
+    } else {
+      # If already installed, just load the package
+      library(pkg, character.only = TRUE)
+    }
+  }
+#######################################################
+
+############################################################################################################
+##########################################################################################################
   ## Check if path tables already exist and create them if they don't
   ### open db connection
   if(db %in% "Oracle"){
@@ -80,7 +98,9 @@ generate_paths <- function(db = "local", oracle.user = oracle.personal.user, ora
   # Close the connection
   dbDisconnect(con)
 #################################################################################################################################################
-  base::message("Generating paths... This may take a while if you have many recaptures!")
+#################################################################################### MAIN FUNCTION:
+
+    base::message("Generating paths... This may take a while if you have many recaptures!")
   ## make table with all recaptures and their release information
   recheck=TRUE
 while(recheck){
