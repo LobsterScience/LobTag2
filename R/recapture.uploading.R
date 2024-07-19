@@ -530,7 +530,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
 
 #' @title batch_upload_recaptures
-#' @import dplyr ROracle DBI shiny DT svDialogs
+#' @import dplyr ROracle DBI shiny DT svDialogs readxl
 #' @description batch uploads tag recaptures data
 #' @export
 batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
@@ -631,11 +631,13 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   dbDisconnect(con)
 
 ####################################################################################################################
+################################################################################################# MAIN FUNCTION:
 
   ## Allow user to choose data file to upload
   dlg_message("In the following window, choose a csv file containing your recaptures data")
-  file_path <- dlg_open(filter = dlg_filters["csv",])$res
-  recaptures <- read.csv(file_path, na.strings = "")
+  file_path <- dlg_open(filter = dlg_filters["xls",])$res
+  recaptures <- read_xlsx(file_path, na = c("","NA"))
+  #recaptures <- read.csv(file_path, na.strings = c("","NA"))
   rec <- recaptures
   ## Process / standardize the data table
 
@@ -701,8 +703,13 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   rec <- rec %>% mutate(TAG_ID = paste0(TAG_PREFIX,as.character(TAG_NUMBER)))
   rec <- rec %>% mutate(REC_DATE = paste(DAY,MONTH,YEAR, sep="/"))
   rec$REC_DATE = format(as.Date(rec$REC_DATE, format = "%d/%m/%Y"), "%Y-%m-%d")
-  ## clean vessel names for problematic characters
+  ## clean columns that tend to have problematic characters
+  rec$COMMENTS = gsub("'","",rec$COMMENTS)
   rec$VESSEL = gsub("'","",rec$VESSEL)
+  rec$TOWN = gsub("'","",rec$TOWN)
+  rec$CIVIC = gsub("'","",rec$CIVIC)
+  rec$CIVIC = gsub("#"," ",rec$CIVIC)
+
 
   ## error checking (General):
   bad_tag_pre = which(rec$TAG_PREFIX %in% NA)

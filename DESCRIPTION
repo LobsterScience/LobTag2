@@ -23,7 +23,8 @@ Imports:
     sf,
     ggplot2,
     ggsflabel,
-    basemaps
+    basemaps,
+    readxl
     
 
     

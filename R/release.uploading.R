@@ -1,5 +1,5 @@
 #' @title upload_releases
-#' @import dplyr RSQLite DBI shiny DT svDialogs
+#' @import dplyr RSQLite DBI shiny DT svDialogs readxl
 #' @description batch uploads tag release data
 #' @export
 
@@ -96,8 +96,9 @@ if(db %in% "Oracle"){
 
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose a csv file containing your releases data")
-file_path <- dlg_open(filter = dlg_filters["csv",])$res
-releases <- read.csv(file_path, na.strings = "")
+file_path <- dlg_open(filter = dlg_filters["xls",])$res
+#releases <- read.csv(file_path, na.strings = "")
+releases <- read_xlsx(file_path, na = c("","NA"))
 ## Process / standardize the data table
 
 ##ccordinate decimal degrees and degrees minutes formatting done here

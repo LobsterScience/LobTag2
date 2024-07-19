@@ -75,7 +75,7 @@ if(all.tags){
   sql = paste0("SELECT * FROM LBT_RECAPTURES")
   rec <- dbSendQuery(conn, sql)
   rec <- fetch(rec)
-  tags <- unique(rec$TAG_ID)
+  tag.IDs <- unique(rec$TAG_ID)
 }
 
 ##
