@@ -1065,19 +1065,35 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
         dbClearResult(result)
       }
 
-      ## check and update PEOPLE table if person is new
-      sql <- paste("SELECT * FROM ",people.tab.name, " WHERE NAME = '", rec$PERSON[i],"'",sep = "")
-      check <- dbSendQuery(con, sql)
-      existing_person <- dbFetch(check)
-      dbClearResult(check)
+      ## update PEOPLE table with any new info
+      sql <- paste(
+        "MERGE INTO \"", people.tab.name, "\" tgt",
+        " USING (SELECT '", rec$PERSON[i], "' AS \"NAME\", '", rec$CIVIC[i], "' AS \"CIVIC\", '", rec$TOWN[i], "' AS \"TOWN\", '",
+        rec$PROV[i], "' AS \"PROV\", '", rec$COUNTRY[i], "' AS \"COUNTRY\", '", rec$POST[i], "' AS \"POST\", '", rec$EMAIL[i], "' AS \"EMAIL\", '",
+        rec$PHO1[i], "' AS \"PHO1\", '", rec$PHO2[i], "' AS \"PHO2\", '", rec$AFFILIATION[i], "' AS \"AFFILIATION\", '", rec$LICENSE_AREA[i], "' AS \"LICENSE_AREA\" FROM dual) src",
+        " ON (tgt.\"NAME\" = src.\"NAME\")",
+        " WHEN MATCHED THEN UPDATE SET",
+        " tgt.\"CIVIC\" = NVL(tgt.\"CIVIC\", src.\"CIVIC\"),",
+        " tgt.\"TOWN\" = NVL(tgt.\"TOWN\", src.\"TOWN\"),",
+        " tgt.\"PROV\" = NVL(tgt.\"PROV\", src.\"PROV\"),",
+        " tgt.\"COUNTRY\" = NVL(tgt.\"COUNTRY\", src.\"COUNTRY\"),",
+        " tgt.\"POST\" = NVL(tgt.\"POST\", src.\"POST\"),",
+        " tgt.\"EMAIL\" = NVL(tgt.\"EMAIL\", src.\"EMAIL\"),",
+        " tgt.\"PHO1\" = NVL(tgt.\"PHO1\", src.\"PHO1\"),",
+        " tgt.\"PHO2\" = NVL(tgt.\"PHO2\", src.\"PHO2\"),",
+        " tgt.\"AFFILIATION\" = NVL(tgt.\"AFFILIATION\", src.\"AFFILIATION\"),",
+        " tgt.\"LICENSE_AREA\" = NVL(tgt.\"LICENSE_AREA\", src.\"LICENSE_AREA\")",
+        " WHEN NOT MATCHED THEN",
+        " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
+        " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
+        sep = ""
+      )
 
-      if(nrow(existing_person)==0){
-        sql <- paste("INSERT INTO ",people.tab.name, " VALUES ('",rec$PERSON[i],"', '",rec$CIVIC[i],"', '",rec$TOWN[i],"', '",rec$PROV[i],"','",rec$COUNTRY[i],"','",rec$POST[i],"','",rec$EMAIL[i],"','",rec$PHO1[i],"','",rec$PHO2[i],"','",rec$AFFILIATION[i],"','",rec$LICENSE_AREA[i],"')", sep = "")
         if(db %in% "local"){dbBegin(con)}
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
-      }
+
 
     }
 

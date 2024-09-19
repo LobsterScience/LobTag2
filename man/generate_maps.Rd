@@ -12,6 +12,9 @@ generate_maps(
   map.token = mapbox.token,
   db = "local",
   output.location = NULL,
+  max.pixels = 8e+05,
+  map.res = 0.9,
+  inset.option = T,
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,
   oracle.dbname = oracle.personal.server

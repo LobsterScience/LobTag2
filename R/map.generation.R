@@ -5,7 +5,7 @@
 #' @export
 
 generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
-                          oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
+                          max.pixels = 800000, map.res = 0.9, inset.option = T, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
   ## only install / load ROracle if the user chooses Oracle functionality
@@ -34,7 +34,9 @@ generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.t
 
 
   ## Allow user to choose whether or not to manually draw inset map
-  result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+  if(inset.option){
+    inset.result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+  }
 
   ### open db connection
   if(db %in% "Oracle"){
@@ -138,6 +140,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     xlen = maxx - minx
     ylen = maxy - miny
 
+
     while(xlen < ylen){
       maxx = maxx+.01
       minx = minx-.01
@@ -166,14 +169,49 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     minx = minx - ylen/3
     maxx = maxx + ylen/3
 
-    ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/3
-    maxx = maxx+scale
-    minx = minx-scale
-    maxy = maxy+scale
-    miny = miny-scale
+      ##visually scale plotting area a bit wider
+      scale = (maxy-miny)/3
+      maxx = maxx+scale
+      minx = minx-scale
+      maxy = maxy+scale
+      miny = miny-scale
 
-    ## If just one point, set box size
+
+    if(ylen <0.19){## extra limit to prevent zoom from getting too close where there are no tiles in some areas
+
+      while(ylen < 0.19){
+        maxy = maxy+.01
+        miny = miny-.01
+        ylen =  maxy - miny
+      }
+
+      while(xlen < ylen){
+        maxx = maxx+.01
+        minx = minx-.01
+        xlen =  maxx - minx
+      }
+
+      while(ylen < 0.19){
+        maxy = maxy+.001
+        miny = miny-.001
+        ylen =  maxy - miny
+      }
+
+      while(xlen < ylen){
+        maxx = maxx+.001
+        minx = minx-.001
+        xlen =  maxx - minx
+      }
+
+      #stretch again on x axis for visual squareness
+      minx = minx - ylen/3
+      maxx = maxx + ylen/3
+
+      }
+
+
+
+      ## If just one point, set box size
     if(maxx == minx & maxy == miny){
       minx = minx - 0.1
       maxx = maxx + 0.1
@@ -193,13 +231,13 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
                  map_token = map.token)
 
-    base <- basemap_raster(ext_sf) #### forces basemap crs to be in 3857
+    base <- basemap_raster(ext_sf, map_res = map.res) #### forces basemap crs to be in 3857
 
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
     base <- raster::projectRaster(base,  crs = 4326)
 
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
-    if(result$res %in% "yes"){ext.inset <- draw_ext()}else{
+    if(exists("inset.result") & inset.result$res %in% "yes"){ext.inset <- draw_ext()}else{
 
       expand = 5
       ## if the mapping area is very small, keep increasing expand factor until inset size is meaningful (at least about 2 degrees of longitude)
@@ -282,7 +320,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
     ## main map
       base <- normalize_raster_brick(base)
-      a <- gg_raster(base, maxpixels=400000)+
+      a <- gg_raster(base, maxpixels=max.pixels)+
         ggspatial::annotation_scale(data = path_sf, bar_cols = c("grey", "white"), text_col = "white")+
         ggtitle(paste(person,"-",i))+
         geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
@@ -309,7 +347,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     inset.top = top+ylen/5
     inset.bottom = inset.top-ylen/3
     inset.height = inset.top-inset.bottom
-    inset.right = right+xlen/10
+    inset.right = right+xlen/30
     inset.width = inset.height*inset.ratio
 
       outplot <- a +
