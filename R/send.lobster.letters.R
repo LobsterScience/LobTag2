@@ -184,7 +184,7 @@ Dartmouth, NS B2Y 4A2"
 
       # Update the confirmation message to inform the user
       output$confirm_message <- renderText({
-        paste("Letter for", basename(current_pdf), "has been moved to the 'sent' folder.")
+        paste("Letter:", basename(current_pdf), "has been moved to the 'sent' folder.")
       })
     })
 
@@ -202,7 +202,7 @@ Dartmouth, NS B2Y 4A2"
 
       # Update the confirmation message to inform the user
       output$confirm_message <- renderText({
-        paste("Letter for", basename(current_pdf), "has been moved to the 'not.sent' folder.")
+        paste("Letter:", basename(current_pdf), "has been moved to the 'not.sent' folder.")
       })
     })
 
