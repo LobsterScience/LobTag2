@@ -4,7 +4,14 @@
 \alias{lobster.letters}
 \title{lobster.letters}
 \usage{
-lobster.letters(region = "ScotianShelf", db = "Oracle", output.location = NULL)
+lobster.letters(
+  people = NULL,
+  db = "Oracle",
+  output.location = NULL,
+  oracle.user = oracle.personal.user,
+  oracle.password = oracle.personal.password,
+  oracle.dbname = oracle.personal.server
+)
 }
 \description{
 create reward letters for fishers who report tags, letters contain map and text.

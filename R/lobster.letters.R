@@ -1,15 +1,23 @@
 
 #' @title  lobster.letters
 #' @description  create reward letters for fishers who report tags, letters contain map and text.
-#' @import ROracle DBI stringi lubridate dplyr sf svDialogs
+#' @import ROracle DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
-lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.location = NULL){
+lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
+                           oracle.user = oracle.personal.user,
+                           oracle.password = oracle.personal.password,
+                           oracle.dbname = oracle.personal.server){
 
   ## let user select output file location for maps
   if(is.null(output.location)){
     dlg_message("In the following window, choose the directory where you want to keep your letters.")
     output.location <- dlg_dir(filter = dlg_filters["csv",])$res
   }
+
+  dir.create(paste0(output.location,"/maps"), showWarnings = F)
+  dir.create(paste0(output.location,"/letters"), showWarnings = F)
+  letter_path = paste0(output.location,"/letters/")
+  markdownfilepath = system.file("data","knit_rewards.Rmd", package = "LobTag2")
 
 
   ## letter building function pulled from LobTag
@@ -26,6 +34,7 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
   \\newline
   Thank you for participating in the lobster tagging program. I thought you would be interested to know that a lobster you had previously released was captured again and information sent in. This information is shown in a chart provided. Recaptures such as these will help us better track the movement of lobsters across the Scotian shelf.</PARAGRAPH mytagcapturedbutihavenoreturns>
   <PARAGRAPH B><name>,
+  \\newline
   \\newline
   Thanks for reporting the lobster <tag/tags> caught last season. A chart showing the release and all recapture positions for the <tag/tags> is included. The information provided by tagging recaptures is helpful in determining the movement of lobster throughout the Scotian Shelf. </PARAGRAPH B>
   <PARAGRAPH info>
@@ -85,12 +94,20 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
   # Letter text and formatting, be careful when changing text to be aware of return line formatting
   lettertxt = rewards.letter.fill()
 
-  #its never gulf
-  gstring = ""
-  drv <- DBI::dbDriver("Oracle")
-  con <- ROracle::dbConnect(drv, username = oracle.personal.user, password = oracle.personal.password, dbname = oracle.personal.server)
+  ### open db connection
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
 
-  da = NULL
 
   #initialize lobster databases
   reldb = "LBT_RELEASES"
@@ -102,6 +119,9 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
   query = paste("SELECT * FROM",captdb)
   capt.quer <- ROracle::dbSendQuery(con, query)
   captures <- ROracle::fetch(capt.quer)
+
+  ## for selective letter generation
+  if(!is.null(people)){captures <- captures %>% filter(PERSON  %in% people)}
 
   cap.tags <- paste0("('",paste(captures$TAG_ID, collapse ="','"),"')")
   cap.names <- paste0("('",paste(captures$PERSON, collapse ="','"),"')")
@@ -154,7 +174,7 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
   captures <- captures_sf
   ######
 
-  captures <- captures %>% dplyr::select(TAG_ID,REC_DATE,MANAGEMENT_AREA,YEAR,RELCODE,REWARDED,PERSON) %>% rename(NAME = PERSON)
+  captures <- captures %>% dplyr::select(TAG_ID,REC_DATE,MANAGEMENT_AREA,YEAR,RELEASED,REWARDED,PERSON) %>% rename(NAME = PERSON)
   peopda <- peopda %>% dplyr::select(NAME,EMAIL,CIVIC,TOWN,PROV,POST,LICENSE_AREA)
   relda <- relda %>% dplyr::select(TAG_ID,YEAR) %>% rename(YEAR1 = YEAR)
 
@@ -166,7 +186,7 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
   ## if any of the fishers still have NA for license area, end function and tell user they need to fix this to run letters
   no.area <- da %>% filter(LICENSE_AREA %in% c(NA,"NA"))
   if(nrow(no.area)>0){
-    return(print(paste("There are fishers in LBT_PEOPLE with no associated LICENSE_AREA and their captures can't be localized within an area. Update LICENSE_AREA for:",paste(no.area$NAME,collapse = ", "))))
+    return(print(paste("Error: There are fishers in LBT_PEOPLE with no associated LICENSE_AREA and their captures can't be localized within an area. Update LICENSE_AREA for:",paste(no.area$NAME,collapse = ", "),"and try again.")))
   }
 
   tid = da$TAG_ID[which(da$REWARDED == 'no')] #Get tag ids of unrewarded returns
@@ -177,6 +197,7 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
 
   for(i in 1:length(persplit)){
     per = list()
+    perlist = list()
     per$data = persplit[[i]]
     per$name = per$data$NAME[1]
     per$email = per$data$EMAIL
@@ -263,17 +284,17 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
           }else{
             per$capturedbeforeandafter = ""
           }
-          if(all(per$data$RELCODE == "1")){
+          if(all(per$data$RELEASED  %in%  c("1","yes"))){
             per$released = getBetween(lettertxt, "PARAGRAPH released" )
           }else{
             per$released = ""
           }
-          if(all(per$data$RELCODE == "2")){
+          if(all(per$data$RELEASED %in% c("2","no"))){
             per$notreleased = getBetween(lettertxt, "PARAGRAPH notreleased" )
           }else{
             per$notreleased = ""
           }
-          if(all(per$data$RELCODE == "3")){
+          if(all(per$data$RELEASED  %in% c("3","unknown"))){
             per$unknownrel = getBetween(lettertxt, "PARAGRAPH unknownrel" )
           }else{
             #per$notreleased = ""
@@ -303,56 +324,69 @@ lobster.letters = function(region = "ScotianShelf", db = "Oracle", output.locati
         per$consider = getBetween(lettertxt, "PARAGRAPH consider")
         per$final = getBetween(lettertxt, "PARAGRAPH final" )
         per$end = getBetween(lettertxt, "PARAGRAPH end" )
-        per$mapdisclaimer = getBetween(lettertxt, "PARAGRAPH mapdisclaimer")
+        #per$mapdisclaimer = getBetween(lettertxt, "PARAGRAPH mapdisclaimer")   ### not needed anymore once we got better maps
 
-        map.dir <- dir.create(paste0(output.location,"/maps"))
-        #generate_maps(people = per$name, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
 
-        #per$charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
-        per$charts <- list.files(path = paste0(output.location,"/maps"), pattern = "AdamSharpe")
-          perlist[[length(perlist)+1]] = per
+        generate_maps(people = per$name, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
+
+        charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
+        c <- c()
+        for(j in 1:length(charts)){
+        c <- c(c,paste0(output.location,"/maps/",charts[j]))
+        }
+        per$charts <- c
+          #perlist[[length(perlist)+1]] = per
+        perlist[[i]] = per
+
+        pdf_file_name = paste(letter_path, per$name, ".pdf", sep = "")
+
+          #render function needs TinyTex installed to run properly. Check if installed and install if not
+          if(tinytex::is_tinytex() %in% FALSE){tinytex::install_tinytex(force = TRUE)}
+
+          rmarkdown::render(input = markdownfilepath,
+                            output_format = 'pdf_document',
+                            output_file = pdf_file_name,
+                            params = list(i = i, perlist = perlist))
+
+          print("done")
+
 
   }
 
-  dir.create(paste0(output.location,"/letters"))
-  letter_path = paste0(output.location,"/letters/")
+  #   library(ROracle)
+  #   library(DBI)
+  #   library(stringi)
+  #   library(lubridate)
+  #   library(dplyr)
+  #   library(sf)
+  #   library(svDialogs)
+  # library(rmarkdown)
 
-  markdownfilepath = system.file("data","knit_rewards.Rmd", package = "LobTag2")
-
-  for(k in 1:length(perlist)){
 
 
-    #if we put the fishername with a ".pdf" on the end of it before passing it
-    #to the markdown function we can create filenames with spaces in them which will match
-    #the formatting of the fishername in the oracle table so we don't have to do any extra
-    #steps when looking up fisher data from the file names later on.
-    pdf_file_name = paste(letter_path, perlist[[k]]$name, ".pdf", sep = "")
+  ####SCRAP
+  # for(k in 1:length(perlist)){
+  #
+  #
+  #   pdf_file_name = paste(letter_path, perlist[[k]]$name, ".pdf", sep = "")
+  #
+  #   #render function needs TinyTex installed to run properly. Check if installed and install if not
+  #   if(tinytex::is_tinytex() %in% FALSE){tinytex::install_tinytex(force = TRUE)}
+  #
+  #   rmarkdown::render(input = markdownfilepath,
+  #                     output_format = 'pdf_document',
+  #                     output_file = pdf_file_name,
+  #                     params = list(i = k, perlist = perlist))
+  #
+  #   print("done")
+  #   #return(perlist[i])
+  # }
 
-    #render function needs TinyTex installed to run properly. Check if installed and install if not
-    if(tinytex::is_tinytex() %in% FALSE){tinytex::install_tinytex(force = TRUE)}
 
-    rmarkdown::render(input = markdownfilepath,
-                      output_format = 'pdf_document',
-                      output_file = pdf_file_name,
-                      params = list(i = k, perlist = perlist))
-
-    #temporary for now, better to use an anon argument in the rewards chart function.
-    # render(input = markdownfilepath,
-    #                   output_format = 'pdf_document',
-    #                   output_file = paste(anon_path,
-    #                                       perlist[[k]]$matcheddata$TAG_ID,
-    #                                       sep = ""),
-    #                   params = list(i = k, perlist = perlist))
-
-    # perlist[[k]]$matcheddata$TAG_ID
-    #rewards.knit.document(other = perlist[1], version = 1)
-    print("done")
-    #return(perlist[i])
   }
 
 
 
-}
 
 
 

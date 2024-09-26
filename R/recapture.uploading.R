@@ -720,7 +720,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   sus_lon = which(rec$LON_DD>0) ## suspect longitudes not in the Western hemisphere
   neg_lat.min = which(!is.na(rec$LAT_MINUTE) & rec$LAT_MINUTE<0)
   neg_lon.min = which(!is.na(rec$LON_MINUTE) & rec$LON_MINUTE<0)
-  bad_date = which(rec$REL_DATE %in% NA)
+  bad_date = which(rec$REC_DATE %in% NA)
 
   ## check if any recapture events seems to be replicates
   rec <- rec %>% mutate(reps = paste(TAG_ID,REC_DATE,LAT_DD,LON_DD))
@@ -928,8 +928,8 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       ## check for already entered recapture events, then upload all new recaptures
       entered =NULL
       for(i in 1:nrow(rec)){
-        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-        sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+        sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",rec$PERSON[i],"'", sep = "")
+        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
         check <- dbSendQuery(con, sql)
         existing_event <- dbFetch(check)
         entered <- rbind(entered,existing_event)
@@ -1051,7 +1051,8 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     entered =NULL
     for(i in 1:nrow(rec)){
       #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",rec$PERSON[i],"'", sep = "")
       check <- dbSendQuery(con, sql)
       existing_event <- dbFetch(check)
       entered <- rbind(entered,existing_event)
@@ -1066,33 +1067,80 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       }
 
       ## update PEOPLE table with any new info
-      sql <- paste(
-        "MERGE INTO \"", people.tab.name, "\" tgt",
-        " USING (SELECT '", rec$PERSON[i], "' AS \"NAME\", '", rec$CIVIC[i], "' AS \"CIVIC\", '", rec$TOWN[i], "' AS \"TOWN\", '",
-        rec$PROV[i], "' AS \"PROV\", '", rec$COUNTRY[i], "' AS \"COUNTRY\", '", rec$POST[i], "' AS \"POST\", '", rec$EMAIL[i], "' AS \"EMAIL\", '",
-        rec$PHO1[i], "' AS \"PHO1\", '", rec$PHO2[i], "' AS \"PHO2\", '", rec$AFFILIATION[i], "' AS \"AFFILIATION\", '", rec$LICENSE_AREA[i], "' AS \"LICENSE_AREA\" FROM dual) src",
-        " ON (tgt.\"NAME\" = src.\"NAME\")",
-        " WHEN MATCHED THEN UPDATE SET",
-        " tgt.\"CIVIC\" = NVL(tgt.\"CIVIC\", src.\"CIVIC\"),",
-        " tgt.\"TOWN\" = NVL(tgt.\"TOWN\", src.\"TOWN\"),",
-        " tgt.\"PROV\" = NVL(tgt.\"PROV\", src.\"PROV\"),",
-        " tgt.\"COUNTRY\" = NVL(tgt.\"COUNTRY\", src.\"COUNTRY\"),",
-        " tgt.\"POST\" = NVL(tgt.\"POST\", src.\"POST\"),",
-        " tgt.\"EMAIL\" = NVL(tgt.\"EMAIL\", src.\"EMAIL\"),",
-        " tgt.\"PHO1\" = NVL(tgt.\"PHO1\", src.\"PHO1\"),",
-        " tgt.\"PHO2\" = NVL(tgt.\"PHO2\", src.\"PHO2\"),",
-        " tgt.\"AFFILIATION\" = NVL(tgt.\"AFFILIATION\", src.\"AFFILIATION\"),",
-        " tgt.\"LICENSE_AREA\" = NVL(tgt.\"LICENSE_AREA\", src.\"LICENSE_AREA\")",
-        " WHEN NOT MATCHED THEN",
-        " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
-        " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
-        sep = ""
-      )
+      if(db  %in% "Oracle"){
+        sql <- paste(
+          "MERGE INTO \"", people.tab.name, "\" tgt",
+          " USING (SELECT '", rec$PERSON[i], "' AS \"NAME\", '", rec$CIVIC[i], "' AS \"CIVIC\", '", rec$TOWN[i], "' AS \"TOWN\", '",
+          rec$PROV[i], "' AS \"PROV\", '", rec$COUNTRY[i], "' AS \"COUNTRY\", '", rec$POST[i], "' AS \"POST\", '", rec$EMAIL[i], "' AS \"EMAIL\", '",
+          rec$PHO1[i], "' AS \"PHO1\", '", rec$PHO2[i], "' AS \"PHO2\", '", rec$AFFILIATION[i], "' AS \"AFFILIATION\", '", rec$LICENSE_AREA[i], "' AS \"LICENSE_AREA\" FROM dual) src",
+          " ON (tgt.\"NAME\" = src.\"NAME\")",
+          " WHEN MATCHED THEN UPDATE SET",
+          " tgt.\"CIVIC\" = NVL(tgt.\"CIVIC\", src.\"CIVIC\"),",
+          " tgt.\"TOWN\" = NVL(tgt.\"TOWN\", src.\"TOWN\"),",
+          " tgt.\"PROV\" = NVL(tgt.\"PROV\", src.\"PROV\"),",
+          " tgt.\"COUNTRY\" = NVL(tgt.\"COUNTRY\", src.\"COUNTRY\"),",
+          " tgt.\"POST\" = NVL(tgt.\"POST\", src.\"POST\"),",
+          " tgt.\"EMAIL\" = NVL(tgt.\"EMAIL\", src.\"EMAIL\"),",
+          " tgt.\"PHO1\" = NVL(tgt.\"PHO1\", src.\"PHO1\"),",
+          " tgt.\"PHO2\" = NVL(tgt.\"PHO2\", src.\"PHO2\"),",
+          " tgt.\"AFFILIATION\" = NVL(tgt.\"AFFILIATION\", src.\"AFFILIATION\"),",
+          " tgt.\"LICENSE_AREA\" = NVL(tgt.\"LICENSE_AREA\", src.\"LICENSE_AREA\")",
+          " WHEN NOT MATCHED THEN",
+          " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
+          " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
+          sep = ""
+        )
 
         if(db %in% "local"){dbBegin(con)}
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
+      }
+
+      if(db %in% "local"){
+        dbBegin(con)
+
+        for(i in seq_len(nrow(rec))){
+          # Construct the UPDATE query
+          update_query <- paste(
+            "UPDATE ", people.tab.name,
+            " SET CIVIC = COALESCE(CIVIC, '", rec$CIVIC[i], "'),",
+            " TOWN = COALESCE(TOWN, '", rec$TOWN[i], "'),",
+            " PROV = COALESCE(PROV, '", rec$PROV[i], "'),",
+            " COUNTRY = COALESCE(COUNTRY, '", rec$COUNTRY[i], "'),",
+            " POST = COALESCE(POST, '", rec$POST[i], "'),",
+            " EMAIL = COALESCE(EMAIL, '", rec$EMAIL[i], "'),",
+            " PHO1 = COALESCE(PHO1, '", rec$PHO1[i], "'),",
+            " PHO2 = COALESCE(PHO2, '", rec$PHO2[i], "'),",
+            " AFFILIATION = COALESCE(AFFILIATION, '", rec$AFFILIATION[i], "'),",
+            " LICENSE_AREA = COALESCE(LICENSE_AREA, '", rec$LICENSE_AREA[i], "')",
+            " WHERE NAME = '", rec$PERSON[i], "'", sep = "")
+
+          # Execute the update query
+          dbExecute(con, update_query)
+
+          # Check if the row was updated
+          affected_rows <- dbGetQuery(con, "SELECT changes() AS affected_rows")
+
+          # If no rows were affected by the update, insert the new row
+          if(affected_rows$affected_rows == 0){
+            insert_query <- paste(
+              "INSERT INTO ", people.tab.name,
+              " (NAME, CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA)",
+              " VALUES ('", rec$PERSON[i], "', '", rec$CIVIC[i], "', '", rec$TOWN[i], "', '", rec$PROV[i], "', '", rec$COUNTRY[i], "', '",
+              rec$POST[i], "', '", rec$EMAIL[i], "', '", rec$PHO1[i], "', '", rec$PHO2[i], "', '", rec$AFFILIATION[i], "', '",
+              rec$LICENSE_AREA[i], "')", sep = "")
+            dbExecute(con, insert_query)
+          }
+        }
+
+        dbCommit(con)
+      }
+
+
+
+
+
 
 
     }

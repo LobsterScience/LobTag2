@@ -34,6 +34,7 @@ generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.t
 
 
   ## Allow user to choose whether or not to manually draw inset map
+  inset.result = NULL
   if(inset.option){
     inset.result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
   }
@@ -237,7 +238,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     base <- raster::projectRaster(base,  crs = 4326)
 
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
-    if(exists("inset.result") & inset.result$res %in% "yes"){ext.inset <- draw_ext()}else{
+    if(!is.null(inset.result) && inset.result$res %in% "yes"){ext.inset <- draw_ext()}else{
 
       expand = 5
       ## if the mapping area is very small, keep increasing expand factor until inset size is meaningful (at least about 2 degrees of longitude)
@@ -320,10 +321,13 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 
     ## main map
       base <- normalize_raster_brick(base)
+      ## For arrow head sizing:
+      if(scale< 0.03){arrow.size = scale*10}else{arrow.size =0.3}
+
       a <- gg_raster(base, maxpixels=max.pixels)+
         ggspatial::annotation_scale(data = path_sf, bar_cols = c("grey", "white"), text_col = "white")+
         ggtitle(paste(person,"-",i))+
-        geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(0.3, "inches")))+
+        geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(arrow.size, "inches")))+
         geom_sf(data=labs.sf, colour = "yellow")+
         geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
