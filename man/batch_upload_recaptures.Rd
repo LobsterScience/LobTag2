@@ -8,7 +8,8 @@ batch_upload_recaptures(
   db = "local",
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server
+  oracle.dbname = oracle.personal.server,
+  backups = T
 )
 }
 \description{

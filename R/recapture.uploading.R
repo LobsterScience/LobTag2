@@ -1,9 +1,9 @@
 #' @title upload_recaptures
-#' @import dplyr RSQLite DBI shiny shinyjs svDialogs
+#' @import dplyr RSQLite DBI shiny shinyjs svDialogs openxlsx
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
-upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
 
 
   ## only install / load ROracle if the user chooses Oracle functionality
@@ -119,6 +119,18 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
 ####################################################################################################
 ######################################################################## Main Function:
+  ## set backups location
+    if(backups){
+      if(oracle.user %in% c("ELEMENTG","ZISSERSONB")){
+        backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+      }else{
+        dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
+        backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
+      }
+
+    }
+
+
   # Define UI for application
   ui <- fluidPage(
 
@@ -388,7 +400,32 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
       # Generate TAG_ID
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
-      # Prepare SQL insert statement
+      # Check if recapture exists and if not, Prepare SQL insert statement
+
+      query <- paste("SELECT * FROM LBT_RECAPTURES WHERE TAG_ID = '",tag_id,"' AND REC_DATE = '",date,"' AND PERSON = '",person,"'",  sep = "")
+      result <- dbGetQuery(con, query)
+      if(nrow(result)<1){
+
+        # Clear input fields
+        shinyjs::reset("tag_prefix")
+        shinyjs::reset("tag_number")
+        shinyjs::reset("date")
+        shinyjs::reset("person")
+        shinyjs::reset("person2")
+        shinyjs::reset("lat_deg")
+        shinyjs::reset("lat_dec_min")
+        shinyjs::reset("long_deg")
+        shinyjs::reset("long_dec_min")
+        shinyjs::reset("depth_fathoms")
+        shinyjs::reset("released")
+        shinyjs::reset("captain")
+        shinyjs::reset("vessel")
+        shinyjs::reset("management_area")
+        shinyjs::reset("capture_length")
+        shinyjs::reset("sex")
+        shinyjs::reset("egg_state")
+        shinyjs::reset("comments")
+
       if(db %in% "Oracle"){
         sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')", sep="")
       }else{sql_1 <- paste0(
@@ -471,10 +508,12 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
       }
 
+      ## commit additions to dbase
+      dbCommit(con)
 
       # Update status
       output$status <- renderText({
-        "Tags to be uploaded to database. Close this window to complete upload."
+        "The following tags have been uploaded to the database:"
       })
 
       # Add submitted data to the table
@@ -483,31 +522,39 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
       updated_data <- rbind(current_data, new_row)
       submitted_data(updated_data)
 
-      # Clear input fields
-      shinyjs::reset("tag_prefix")
-      shinyjs::reset("tag_number")
-      shinyjs::reset("date")
-      shinyjs::reset("person")
-      shinyjs::reset("person2")
-      shinyjs::reset("lat_deg")
-      shinyjs::reset("lat_dec_min")
-      shinyjs::reset("long_deg")
-      shinyjs::reset("long_dec_min")
-      shinyjs::reset("depth_fathoms")
-      shinyjs::reset("released")
-      shinyjs::reset("captain")
-      shinyjs::reset("vessel")
-      shinyjs::reset("management_area")
-      shinyjs::reset("capture_length")
-      shinyjs::reset("sex")
-      shinyjs::reset("egg_state")
-      shinyjs::reset("comments")
-    })
+      # Render submitted data
+      output$submitted_data <- renderTable({
+        submitted_data()[,1:7]
+      })
 
-    # Render submitted data
-    output$submitted_data <- renderTable({
-      submitted_data()[,1:7]
-    })
+      ##update excel backups
+      delay(500,
+            if(backups){
+              ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE on shared drive
+              rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+              rec.tab <- fetch(rec.tab)
+              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURES.xlsx"), row.names = F)
+
+              peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+              peep.tab <- fetch(peep.tab)
+              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), row.names = F)
+              print(paste0("Data backups stored in ",backup.dir))
+            }
+      )
+
+
+
+      }else{
+
+        # Update status
+        output$status <- renderText({
+          paste("A recapture of tag",tag_id,"on",date,"by",person,"already exists! Recapture cannot be added.")
+        })
+
+      }
+
+      }) ## end of Submit observation
+
 
     # Close Oracle connection on app exit
     session$onSessionEnded(function() {
@@ -530,10 +577,10 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
 
 #' @title batch_upload_recaptures
-#' @import dplyr ROracle DBI shiny DT svDialogs readxl
+#' @import dplyr ROracle DBI shiny DT svDialogs readxl openxlsx
 #' @description batch uploads tag recaptures data
 #' @export
-batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
 
   ## Check if recaptures and people tables already exist and create if not
 
@@ -639,6 +686,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   recaptures <- read_xlsx(file_path, na = c("","NA"))
   #recaptures <- read.csv(file_path, na.strings = c("","NA"))
   rec <- recaptures
+
   ## Process / standardize the data table
 
   ##testing
@@ -1204,12 +1252,60 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
 
 
   }
+
+
+  ## run excel backups if the function completes successfully
+  ## set backups location
+  if(backups){
+    if(oracle.user %in% c("ELEMENTG","ZISSERSONB")){
+      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+    }else{
+      dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
+      backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
+    }
+
+  # Connect to database
+  if(db %in% "Oracle"){
+    tryCatch({
+      drv <- DBI::dbDriver("Oracle")
+      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+    }, warning = function(w) {
+    }, error = function(e) {
+      return(toJSON("Connection failed"))
+    }, finally = {
+    })
+  }else{
+    dir.create("C:/LOBTAG", showWarnings = F)
+    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+  }
+
+  ##update excel backups
+    ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
+    rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURE")
+    rec.tab <- fetch(rec.tab)
+    openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURE.xlsx"), row.names = F)
+
+    peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+    peep.tab <- fetch(peep.tab)
+    openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), row.names = F)
+
+  dbDisconnect(con)
+
+  }
+
+
   # library(dplyr)
   # library(ROracle)
   # library(shiny)
   # library(shinyjs)
   # library(svDialogs)
   # library(DT)
+
+
+
+
+
+
 
 }
 
