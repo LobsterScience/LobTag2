@@ -121,7 +121,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 ######################################################################## Main Function:
   ## set backups location
     if(backups){
-      if(oracle.user %in% c("ELEMENTG","ZISSERSONB")){
+      if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB")){
         backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
       }else{
         dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
@@ -513,7 +513,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
       # Update status
       output$status <- renderText({
-        "The following tags have been uploaded to the database:"
+        "The following tag recaptures have been uploaded to the database:"
       })
 
       # Add submitted data to the table
@@ -533,11 +533,11 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
               ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE on shared drive
               rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
               rec.tab <- fetch(rec.tab)
-              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURES.xlsx"), row.names = F)
+              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURES.xlsx"), rowNames = F)
 
               peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
               peep.tab <- fetch(peep.tab)
-              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), row.names = F)
+              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), rowNames = F)
               print(paste0("Data backups stored in ",backup.dir))
             }
       )
@@ -1257,7 +1257,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   ## run excel backups if the function completes successfully
   ## set backups location
   if(backups){
-    if(oracle.user %in% c("ELEMENTG","ZISSERSONB")){
+    if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB")){
       backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
     }else{
       dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
@@ -1281,15 +1281,17 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
 
   ##update excel backups
     ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
-    rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURE")
+    rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
     rec.tab <- fetch(rec.tab)
-    openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURE.xlsx"), row.names = F)
+    openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/LBT_RECAPTURES.xlsx"), rowNames = F)
 
     peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
     peep.tab <- fetch(peep.tab)
-    openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), row.names = F)
+    openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/LBT_PEOPLE.xlsx"), rowNames = F)
 
   dbDisconnect(con)
+
+  print(paste0("Data backups stored in ",backup.dir))
 
   }
 
