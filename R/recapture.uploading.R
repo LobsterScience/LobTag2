@@ -3,7 +3,7 @@
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
-upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
+upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
 
 
   ## only install / load ROracle if the user chooses Oracle functionality
@@ -580,7 +580,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 #' @import dplyr ROracle DBI shiny DT svDialogs readxl openxlsx
 #' @description batch uploads tag recaptures data
 #' @export
-batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
+batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
 
   ## Check if recaptures and people tables already exist and create if not
 

@@ -327,12 +327,26 @@ if(length(repath)>0){
         pathdb = "LBT_PATH"
         pathsdb = "LBT_PATHS"
 
-        path_call = create_sql_query(pathdb, df2towrite)
-        paths_call = create_sql_query(pathsdb, dxtowrite)
+        ##old method, caused oracle issues with large number of rows
+        # path_call = create_sql_query(pathdb, df2towrite)
+        # # paths_call = create_sql_query(pathsdb, dxtowrite)
+        # result <- dbSendQuery(con, path_call)
+        # result <- dbSendQuery(con, paths_call)
 
-        result <- dbSendQuery(con, path_call)
-        result <- dbSendQuery(con, paths_call)
+        ##path
+        for(i in 1:nrow(df2towrite)){
+          path_call = create_sql_query(pathdb, df2towrite[i,])
+          result <- dbSendQuery(con, path_call)
+          dbClearResult(result)
+        }
+        dbCommit(con)
 
+        ##paths
+        for(i in 1:nrow(dxtowrite)){
+          paths_call = create_sql_query(pathsdb, dxtowrite[i,])
+          result <- dbSendQuery(con, paths_call)
+          dbClearResult(result)
+        }
         dbCommit(con)
 
         print("New paths calculated and written to path tables.")

@@ -3,7 +3,7 @@
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+upload_releases <- function(db = NULL,oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -95,7 +95,7 @@ if(db %in% "Oracle"){
 ###################################################################### MAIN FUNCTION:
 
 ## Allow user to choose data file to upload
-dlg_message("In the following window, choose a csv file containing your releases data")
+dlg_message("In the following window, choose an xlsx file containing your releases data")
 file_path <- dlg_open(filter = dlg_filters["xls",])$res
 #releases <- read.csv(file_path, na.strings = "")
 releases <- read_xlsx(file_path, na = c("","NA"))
