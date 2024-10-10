@@ -3,7 +3,7 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost"){
+generate_paths <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "gebco_2024_n47.9626_s43.0861_w-66.985_e-58.9213.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost", regen.paths = FALSE){
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -158,19 +158,31 @@ while(recheck){
     if(nrow(pdat)==0){stop("Tag ID not found!")}
   }
   ## Don't re-generate paths that already exist
+  repath = NULL
+  if(!regen.paths){
   pathed = which(paste(as.character(pdat$TAG_ID), pdat$REC_DATE) %in% paste(as.character(dat$TID), as.character(dat$CDATE)))
   if(length(pathed)>0){x = pdat[-pathed,]}else{x=pdat}
+
   ##Unless... there are new recaptures with dates earlier then current most recent recapture; in these cases will need to clear and regenerate the whole path
-  repath = NULL
+
   for(i in unique(x$TAG_ID)){
     tab <- x %>% filter(TAG_ID %in% i)
     d <- unique(tab$REC_DATE)
     p.tab <- pdat[pathed,] %>% filter(TAG_ID %in% i)
     earlier <- any(tab$REC_DATE<max(p.tab$REC_DATE))
     if(earlier){repath=c(repath,i)}
+    }
+
   }
+  ## OR unless regen.paths is selected by user
+  if(regen.paths){
+    x = pdat
+    repath = unique(x$TAG_ID)}
+
 if(length(repath)>0){
-  base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")
+  if(!regen.paths){
+    base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")
+  }
   if(db %in% "Oracle"){
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
@@ -200,7 +212,7 @@ if(length(repath)>0){
   }
   dbDisconnect(con)
   ## if recheck is true, start back over and re-query the database with bad paths removed
-  recheck=TRUE
+  if(regen.paths){recheck=FALSE}else{recheck=TRUE} ## don't need to recheck if the user already chose to regen all the chosen tags
   }else{recheck=FALSE}
 
 
@@ -220,7 +232,8 @@ if(length(repath)>0){
     trans = NULL
     r = raster(depth.raster.path)
     mr = as.matrix(r)
-    mr[which(mr > -5000 & mr < -1)] = -1                       #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
+    mr[which(mr >= -2)] = 100  ## turn any very shallow points into land to avoid land crossings due to reolution
+    mr[which(mr > -5000 & mr < -2)] = -1 #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
     mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
     r = setValues(r, mr)
 
