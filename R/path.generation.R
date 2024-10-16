@@ -230,43 +230,7 @@ if(length(repath)>0){
 
     ################################################ prepare depth raster
     trans = NULL
-  #   r = raster(depth.raster.path)
-  #
-  #   ### trim raster to data area to avoid working with whole map
-  #   xmin = min(as.numeric(c(x$rel_lon,x$rec_lon)))
-  #   xmax = max(as.numeric(c(x$rel_lon,x$rec_lon)))
-  #   ymin = min(as.numeric(c(x$rel_lat,x$rec_lat)))
-  #   ymax = max(as.numeric(c(x$rel_lat,x$rec_lat)))
-  #
-  #   ymax = ymax+0.1
-  #   ymin = ymin-0.1
-  #   xmax=xmax+0.1
-  #   xmin=xmin-0.1
-  #   #
-  #   extent_values <- extent(xmin,xmax,ymin,ymax)
-  #   r <- crop(r, extent_values)
-  #
-  #   mr = as.matrix(r)
-  # # mr[which(mr >= -4)] = 100  ## turn any very shallow points into land to avoid land crossings due to resolution
-  #   mr[which(mr > -5000 & mr < -4)] = -1 #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
-  #   mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
-  #   #mr[which(mr > 0.05)] = 1000
-  #   r = setValues(r, mr)
-  #
-  #   ## map resolution will never be perfect, if there are land crossings as a result, can manually edit depth points on the map to redefine land
-  #   ## Doing this will build a more accurate map over time
-  #   # Coordinates to modify (x, y)
-  #   mod.coords <- matrix(c(
-  #     ##XY461
-  #     -59.70,46.015,-59.69,46.04,-59.685,46.04,-59.68,46.04,-59.678,46.04,-59.675,46.04,-59.67,46.04,-59.665,46.04,-59.66,46.04,
-  #     ##XY2400
-  #     -59.81,46.12,-59.805,46.125,-59.805,46.127,-59.805,46.13,-59.80,46.13,-59.80,46.125,-59.80,46.120,-59.80,46.127,-59.80,46.115,-59.805,46.115,-59.81,46.115,-59.815,46.115,-59.795,46.127,-59.797,46.127,-59.797,46.125,-59.797,46.12), ncol=2, byrow=TRUE)
-  #
-  #
-  #   # Identify the cell numbers corresponding to the coordinates
-  #   cell_indices <- cellFromXY(r, mod.coords)
-  #   # Modify the values
-  #   values(r)[cell_indices] = 0
+
 
     r = rast(depth.raster.path)
 
@@ -276,17 +240,20 @@ if(length(repath)>0){
       ymin = min(as.numeric(c(x$rel_lat,x$rec_lat)))
       ymax = max(as.numeric(c(x$rel_lat,x$rec_lat)))
 
+
+      ##for troubleshooting (can see land pixels closeup. Keep cropped but increase crop size when done; crop greatly improves function speed but too small runs risk of paths not having route to escape land):
+      ###################
       ymax = ymax+0.1
       ymin = ymin-0.1
       xmax=xmax+0.1
       xmin=xmin-0.1
-      #
+      ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
 
     # Reclassify matrix with 3 columns: lower bound, upper bound, and new value
-    reclass_matrix <- matrix(c(-Inf, -2, 1,    # Deep water (< -2 meter) gets a cost of 1
-                               -2, Inf, Inf),  # Shallow water (>= -2 meter) and land are assigned Inf (impassable)
+    reclass_matrix <- matrix(c(-Inf, 0, 1,    # Deep water (< 0 meter) gets a cost of 1
+                               0, Inf, Inf),  # Shallow water (>= 0 meter) and land are assigned Inf (impassable)
                              ncol = 3, byrow = TRUE)
     # Create a binary mask: Land = Inf cost, Ocean = depth or constant cost
     # Set land (elevation > 0) to a very high cost (or Inf)
@@ -294,6 +261,10 @@ if(length(repath)>0){
 
     ################################### can directly edit cells to create land in problem areas
     new_land_coords <- data.frame(lon = c(-59.81, -59.815, -59.805,-59.80,-59.80,-59.80), lat = c(46.125, 46.125,46.125,46.125,46.127,46.13))
+    XY1878 <- data.frame(lon = c(-60.35), lat = c(46.655))
+    XY461 <- data.frame(lon = c(-59.685,-59.682,-59.685,-59.679,-59.72,-59.715,-59.71,-59.71,-59.71,-59.71,-59.71), lat = c(46.03,46.034,46.034,46.034,46.015,46.015,46.015,46.02,46.025,46.027,46.03))
+    XY4348 <- data.frame(lon = c(-63.277,-63.277,-63.285),lat = c(44.625,44.627,44.627))
+    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348)
     # Create a SpatVector from the coordinates
     new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
     # Use extract() to find the cell numbers corresponding to the new land points
@@ -304,12 +275,13 @@ if(length(repath)>0){
 
     # Convert SpatRaster to RasterLayer
     r <- as(cost_surface, "Raster")
+     ## plot(r)
 
 
 
     ### begin pathing
     #tr <- transition(r, mean, neighborhood)
-    tr <- transition(r, function(x) 1/mean(x), directions=8)
+    tr <- transition(r, function(x) 1/mean(x), directions=neighborhood)
     if(type  == "random.walk"){
       trans = geoCorrection(tr, type = "r", scl=FALSE)
     }
@@ -448,26 +420,25 @@ if(length(repath)>0){
 
 
 ## troubleshooting code
-
+#
   # library(dplyr)
   # library(raster)
   # library(gdistance)
-  # library(PBSmapping)
   # library(ROracle)
-  #library(terra)
+  # library(terra)
   #
   # db = "Oracle"
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
   # oracle.dbname = oracle.personal.server
-  # tags = "XY2400"
+  # tags = "XY4348"
   # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
   # neighborhood = 8
   # type = "least.cost"
   # regen.paths = T
 
-  ##generate_paths(db = "Oracle",tags = "XY2400", regen.paths = T)
-  ##generate_maps(db="Oracle",tag.IDs = "XY2400")
+  ##generate_paths(db = "Oracle",tags = "XY461", regen.paths = T)
+  ##generate_maps(db="Oracle",tag.IDs = "XY461")
 
   }
 
