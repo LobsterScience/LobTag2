@@ -5,14 +5,15 @@
 \title{generate_paths}
 \usage{
 generate_paths(
-  db = "local",
+  db = NULL,
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,
   oracle.dbname = oracle.personal.server,
   tags = "all",
-  depth.raster.path = system.file("data", "depthraster2.tif", package = "LobTag2"),
-  neighborhood = 16,
-  type = "least.cost"
+  depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
+  neighborhood = 8,
+  type = "least.cost",
+  regen.paths = FALSE
 )
 }
 \description{

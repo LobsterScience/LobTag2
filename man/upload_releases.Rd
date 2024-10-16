@@ -5,7 +5,7 @@
 \title{upload_releases}
 \usage{
 upload_releases(
-  db = "local",
+  db = NULL,
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,
   oracle.dbname = oracle.personal.server

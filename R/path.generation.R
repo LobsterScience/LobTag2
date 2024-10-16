@@ -1,9 +1,9 @@
 #' @title generate_paths
-#' @import dplyr RSQLite raster gdistance PBSmapping
+#' @import dplyr RSQLite raster gdistance PBSmapping terra
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "gebco_2024_n47.9626_s43.0861_w-66.985_e-58.9213.tif", package = "LobTag2"), neighborhood = 16, type = "least.cost", regen.paths = FALSE){
+generate_paths <- function(db = NULL, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"), neighborhood = 8, type = "least.cost", regen.paths = FALSE){
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -153,7 +153,7 @@ while(recheck){
   dbDisconnect(con)
 
   ## for selected tag:
-  if(!(tags %in% "all")){
+  if(!(any(tags %in% "all"))){
     pdat <- pdat %>% filter(TAG_ID %in% tags)
     if(nrow(pdat)==0){stop("Tag ID not found!")}
   }
@@ -230,14 +230,86 @@ if(length(repath)>0){
 
     ################################################ prepare depth raster
     trans = NULL
-    r = raster(depth.raster.path)
-    mr = as.matrix(r)
-    mr[which(mr >= -2)] = 100  ## turn any very shallow points into land to avoid land crossings due to reolution
-    mr[which(mr > -5000 & mr < -2)] = -1 #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
-    mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
-    r = setValues(r, mr)
+  #   r = raster(depth.raster.path)
+  #
+  #   ### trim raster to data area to avoid working with whole map
+  #   xmin = min(as.numeric(c(x$rel_lon,x$rec_lon)))
+  #   xmax = max(as.numeric(c(x$rel_lon,x$rec_lon)))
+  #   ymin = min(as.numeric(c(x$rel_lat,x$rec_lat)))
+  #   ymax = max(as.numeric(c(x$rel_lat,x$rec_lat)))
+  #
+  #   ymax = ymax+0.1
+  #   ymin = ymin-0.1
+  #   xmax=xmax+0.1
+  #   xmin=xmin-0.1
+  #   #
+  #   extent_values <- extent(xmin,xmax,ymin,ymax)
+  #   r <- crop(r, extent_values)
+  #
+  #   mr = as.matrix(r)
+  # # mr[which(mr >= -4)] = 100  ## turn any very shallow points into land to avoid land crossings due to resolution
+  #   mr[which(mr > -5000 & mr < -4)] = -1 #using least cost (the lowest point is in the -4000s so we can go from -5000 to 0 ie. sea level)
+  #   mr = apply(mr, 2, function(x) dnorm(x,mean=-1,sd=1))
+  #   #mr[which(mr > 0.05)] = 1000
+  #   r = setValues(r, mr)
+  #
+  #   ## map resolution will never be perfect, if there are land crossings as a result, can manually edit depth points on the map to redefine land
+  #   ## Doing this will build a more accurate map over time
+  #   # Coordinates to modify (x, y)
+  #   mod.coords <- matrix(c(
+  #     ##XY461
+  #     -59.70,46.015,-59.69,46.04,-59.685,46.04,-59.68,46.04,-59.678,46.04,-59.675,46.04,-59.67,46.04,-59.665,46.04,-59.66,46.04,
+  #     ##XY2400
+  #     -59.81,46.12,-59.805,46.125,-59.805,46.127,-59.805,46.13,-59.80,46.13,-59.80,46.125,-59.80,46.120,-59.80,46.127,-59.80,46.115,-59.805,46.115,-59.81,46.115,-59.815,46.115,-59.795,46.127,-59.797,46.127,-59.797,46.125,-59.797,46.12), ncol=2, byrow=TRUE)
+  #
+  #
+  #   # Identify the cell numbers corresponding to the coordinates
+  #   cell_indices <- cellFromXY(r, mod.coords)
+  #   # Modify the values
+  #   values(r)[cell_indices] = 0
 
-    tr <- transition(r, mean, neighborhood)
+    r = rast(depth.raster.path)
+
+      ### trim raster to data area to avoid working with whole map
+      xmin = min(as.numeric(c(x$rel_lon,x$rec_lon)))
+      xmax = max(as.numeric(c(x$rel_lon,x$rec_lon)))
+      ymin = min(as.numeric(c(x$rel_lat,x$rec_lat)))
+      ymax = max(as.numeric(c(x$rel_lat,x$rec_lat)))
+
+      ymax = ymax+0.1
+      ymin = ymin-0.1
+      xmax=xmax+0.1
+      xmin=xmin-0.1
+      #
+      extent_values <- extent(xmin,xmax,ymin,ymax)
+      r <- crop(r, extent_values)
+
+    # Reclassify matrix with 3 columns: lower bound, upper bound, and new value
+    reclass_matrix <- matrix(c(-Inf, -2, 1,    # Deep water (< -2 meter) gets a cost of 1
+                               -2, Inf, Inf),  # Shallow water (>= -2 meter) and land are assigned Inf (impassable)
+                             ncol = 3, byrow = TRUE)
+    # Create a binary mask: Land = Inf cost, Ocean = depth or constant cost
+    # Set land (elevation > 0) to a very high cost (or Inf)
+    cost_surface <- classify(r, reclass_matrix)
+
+    ################################### can directly edit cells to create land in problem areas
+    new_land_coords <- data.frame(lon = c(-59.81, -59.815, -59.805,-59.80,-59.80,-59.80), lat = c(46.125, 46.125,46.125,46.125,46.127,46.13))
+    # Create a SpatVector from the coordinates
+    new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
+    # Use extract() to find the cell numbers corresponding to the new land points
+    land_cells <- cellFromXY(cost_surface, as.matrix(new_land_coords))
+    # Set the identified cells to Inf (land)
+    cost_surface[land_cells] <- Inf
+    ###################################
+
+    # Convert SpatRaster to RasterLayer
+    r <- as(cost_surface, "Raster")
+
+
+
+    ### begin pathing
+    #tr <- transition(r, mean, neighborhood)
+    tr <- transition(r, function(x) 1/mean(x), directions=8)
     if(type  == "random.walk"){
       trans = geoCorrection(tr, type = "r", scl=FALSE)
     }
@@ -375,11 +447,27 @@ if(length(repath)>0){
     print("No new paths created.")  }
 
 
+## troubleshooting code
+
   # library(dplyr)
   # library(raster)
   # library(gdistance)
   # library(PBSmapping)
+  # library(ROracle)
+  #library(terra)
+  #
+  # db = "Oracle"
+  # oracle.user = oracle.personal.user
+  # oracle.password = oracle.personal.password
+  # oracle.dbname = oracle.personal.server
+  # tags = "XY2400"
+  # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
+  # neighborhood = 8
+  # type = "least.cost"
+  # regen.paths = T
 
+  ##generate_paths(db = "Oracle",tags = "XY2400", regen.paths = T)
+  ##generate_maps(db="Oracle",tag.IDs = "XY2400")
 
   }
 

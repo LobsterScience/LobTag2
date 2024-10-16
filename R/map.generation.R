@@ -380,10 +380,10 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
 #' @description specific mapping function for mapping releases and returns by custom factor
 #' @export
 
-map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.prefix = NULL, add.paths = F,
-                          map.token = mapbox.token, db = "local", output.location = NULL,
+map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,group.by=NULL,all.releases = F, tag.prefix = NULL, add.paths = F,
+                          map.token = mapbox.token, db = NULL, output.location = NULL,
                           oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
-                          oracle.dbname = oracle.personal.server, set.output = T, set.inset=T){
+                          oracle.dbname = oracle.personal.server, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T){
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -438,22 +438,41 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
   releases <- dbSendQuery(conn, query)
   releases <- fetch(releases)
 
-  tab <- sub(paste0(":", ".*"), "", map.by)
-  map.fact <- sub(paste0(".*", ":"), "", map.by)
+  select.factors <- c("TAG_ID")    ### minimal information that can be included
+  tab <- sub(paste0(":", ".*"), "", factor.from)
+
+  if(!is.null(map.by)){
+    map_fact <- sub(paste0(".*", ":"), "", map.by)
+    releases <- releases %>% rename("map_fact" = all_of(map_fact))
+    recaptures <- recaptures %>% rename("map_fact" = all_of(map_fact))
+    select.factors <- c(select.factors,"map_fact")
+
+  }else{
+    ### defaults to whole dataset if no map.by is chosen
+    releases$map_fact = "all"
+    recaptures$map_fact = "all"
+    select.factors <- c(select.factors,"map_fact")
+    }
+
+  if(!is.null(group.by)){
+    select.factors <- c(select.factors,group.by)
+  }
 
   if(tab %in% c("releases","RELEASES")){
-    rel <- releases %>% dplyr::select(TAG_ID,all_of(map.fact)) %>% rename(map_fact = all_of(map.fact))
-    rel.dat <- left_join(releases,rel)
-    rec.dat <- left_join(recaptures,rel)
-  }
+    rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
+    rel <- releases %>% dplyr::select(all_of(select.factors))
+    rec <- left_join(recaptures,rel)
+    rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
+    loop.factor = rel.dat$map_fact
+    }
   if(tab %in% c("recaptures","RECAPTURES")){
-    rec <- recaptures %>% dplyr::select(TAG_ID,all_of(map.fact)) %>% rename(map_fact = all_of(map.fact))
-    rec.dat <- left_join(recaptures, rec)
-    rel.dat <- left_join(releases,rec)
+    rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
+    rec <- recaptures %>% dplyr::select(all_of(select.factors))
+    rel<- left_join(releases,rec)
+    rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
+    loop.factor = rec.dat$map_fact
   }
 
-  rel.dat <- rel.dat %>% dplyr::select(TAG_ID,REL_DATE,LAT_DD,LON_DD,map_fact)
-  rec.dat <- rec.dat %>% dplyr::select(TAG_ID,REC_DATE,LAT_DD,LON_DD,map_fact)
 
   if(add.paths){
     ## bring in paths
@@ -473,11 +492,11 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
   dbDisconnect(conn)
 
   ## include optional filter for specific value of mapping factor
-  if(!is.null(filter.for)){
-    rec.dat <- rec.dat %>% filter(map_fact %in% filter.for)
+  if(!is.null(filter.maps.for)){
+    rec.dat <- rec.dat %>% filter(map_fact %in% filter.maps.for)
   }
 
-  for(i in unique(rec.dat$map_fact)){
+  for(i in unique(loop.factor)){
 
     ##point geometry
     rel.points <- rel.dat %>% filter(map_fact %in% i)
@@ -549,7 +568,7 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
     maxx = maxx + ylen/3
 
     ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/3
+    scale = (maxy-miny)/6
     maxx = maxx+scale
     minx = minx-scale
     maxy = maxy+scale
@@ -575,11 +594,12 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
                  map_token = map.token)
 
-    base <- basemap_raster(ext_sf) #### forces basemap crs to be in 3857
+    base <- basemap_raster(ext_sf, map_res = map.res) #### forces basemap crs to be in 3857
 
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
     base <- raster::projectRaster(base,  crs = 4326)
 
+    if(inset.map){
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
     if(result$res %in% "yes"){ext.inset <- draw_ext()}else{
 
@@ -601,7 +621,16 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
     ## reproject raster to change back to 4326, this can cause some colour problems when graphing later (raster package has some masking issues with sf, so just use ::)
     inset <- raster::projectRaster(inset,  crs = 4326)
 
-    ## get dimensions information of base and inset for graph placement
+    ##get dimensions infromation of inset for graph placement
+    inset.lim <- sf::st_bbox(inset)
+    inset.ylen = as.numeric(inset.lim$ymax-inset.lim$ymin)
+    inset.xlen = as.numeric(inset.lim$xmax-inset.lim$xmin)
+    inset.ratio = inset.xlen/inset.ylen
+
+
+    }
+
+    ## get dimensions information of base
     limits <- sf::st_bbox(base)
     ylen = as.numeric(limits$ymax-limits$ymin)
     xlen = as.numeric(limits$xmax-limits$xmin)
@@ -609,11 +638,6 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
     right <- as.numeric(limits$xmax)
     top <- as.numeric(limits$ymax)
     bottom <- as.numeric(limits$ymin)
-
-    inset.lim <- sf::st_bbox(inset)
-    inset.ylen = as.numeric(inset.lim$ymax-inset.lim$ymin)
-    inset.xlen = as.numeric(inset.lim$xmax-inset.lim$xmin)
-    inset.ratio = inset.xlen/inset.ylen
 
     ## graphing
     ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
@@ -654,20 +678,35 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
     ## main map
     base <- normalize_raster_brick(base)
 
-    a <- gg_raster(base, maxpixels=400000)+
+    a <- gg_raster(base, maxpixels=max.pixels)+
       ggspatial::annotation_scale(data = sf_rel, bar_cols = c("grey", "white"), text_col = "white")+
       ggtitle(paste(map.by,"-",i))
     if(add.paths){
       p <- geom_sf(data = path_sf, colour = "yellow")
       a <- a+p
     }
-
-    a <- a+geom_sf(data=sf_rec, size=2.5, aes(color = "Recaptures"))+
-      geom_sf(data=sf_rel, size=2.5,aes(colour = "Releases"))+
+if(is.na(group.by)){
+  a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+    geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+    coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+    theme(plot.margin = margin(t = 73))
+}else{
+  if(tab %in% c("releases","RELEASES")){
+    a <- a+
+      geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]]))+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
       theme(plot.margin = margin(t = 73))
+  }
+  if(tab %in% c("recaptures","RECAPTURES")){
+    a <- a+
+      geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
+      coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+      theme(plot.margin = margin(t = 73))
+  }
+}
 
 
+if(inset.map){
     ## inset map
     inset <- normalize_raster_brick(inset)
     b <- gg_raster(inset, maxpixels=300000)+
@@ -690,9 +729,11 @@ map_by_factor <- function(map.by = NULL, filter.for=NULL, all.releases = F, tag.
 
     outplot <- a +
       annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
+}else{outplot <- a}
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
-    ggsave(filename = paste0(tab," ",map.fact," ",i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
+    name.by =ifelse(!is.null(map.by),map_fact,"")
+    ggsave(filename = paste0(tab," ",name.by," ",i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
 
 
   }
