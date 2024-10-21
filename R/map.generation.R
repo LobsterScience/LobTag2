@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(people=NULL, all.people = FALSE, tag.IDs = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
+generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
                           max.pixels = 800000, map.res = 0.9, inset.option = T, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
@@ -78,18 +78,18 @@ if(all.tags){
   sql = paste0("SELECT * FROM LBT_RECAPTURES")
   rec <- dbSendQuery(conn, sql)
   rec <- fetch(rec)
-  tag.IDs <- unique(rec$TAG_ID)
+  tags <- unique(rec$TAG_ID)
 }
 
 ##
 dbDisconnect(conn)
 
-if(!is.null(tag.IDs)){
-  paths <- paths %>% filter(TID %in% tag.IDs)
+if(!is.null(tags)){
+  paths <- paths %>% filter(TID %in% tags)
   people <- unique((paths %>% filter(!REC_PERSON %in% NA))$REC_PERSON)
 }
 
-if(is.null(people) & is.null(tag.IDs)){base::message("No tags or people chosen to make maps for!")}
+if(is.null(people) & is.null(tags)){base::message("No tags or people chosen to make maps for!")}
 ## loops if there's more than one person
 for (p in people){
   person = p
