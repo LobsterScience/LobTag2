@@ -33,11 +33,14 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
   <PARAGRAPH mytagcapturedbutihavenoreturns>  <name>,
   \\newline
   Thank you for participating in the lobster tagging program. I thought you would be interested to know that a lobster you had previously released was captured again and information sent in. This information is shown in a chart provided. Recaptures such as these will help us better track the movement of lobsters across the Scotian shelf.</PARAGRAPH mytagcapturedbutihavenoreturns>
+  \\newline
   <PARAGRAPH B><name>,
   \\newline
   \\newline
-  Thanks for reporting the lobster <tag/tags> caught last season. A chart showing the release and all recapture positions for the <tag/tags> is included. The information provided by tagging recaptures is helpful in determining the movement of lobster throughout the Scotian Shelf. </PARAGRAPH B>
+  Thanks for reporting the lobster <tag/tags> caught last season. A chart showing the release and all recapture positions for the <tag/tags> is included. The information provided by tagging recaptures is helpful in determining the movement of lobster throughout the Scotian Shelf.</PARAGRAPH B>
+  \\newline
   <PARAGRAPH info>
+  \\newline
   \\newline
   The tagged lobster you caught <was/were/wereall> tagged in the <yeartagged/yearstagged/season/seasons>.</PARAGRAPH info>
   <PARAGRAPH capturedbefore>
@@ -53,7 +56,7 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
   <PARAGRAPH consider>
   \\newline
   \\newline
-  For future tagged lobster recaptures, please let us know if they are released or retained. Additional knowledge will be gained by tracking subsequent recaptures of individual lobsters over their lifespan.</PARAGRAPH consider>
+  Letting us know if tagged lobsters are released or retained is helpful; additional knowledge will be gained by tracking subsequent recaptures of individual lobsters over their lifespan.</PARAGRAPH consider>
   <PARAGRAPH pickup>
   \\newline
   \\newline
@@ -63,7 +66,10 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
   <PARAGRAPH released>If you are interested in participating in tagging lobsters at the close of the commercial season in your area, please send an email to lobtags@gmail.com. </PARAGRAPH released>
   <PARAGRAPH mixedrelret>If you are interested in participating in tagging lobsters at the close of the commercial season in your area, please send an email to lobtags@gmail.com. </PARAGRAPH mixedrelret>
   <PARAGRAPH unknownrel>If you are interested in participating in tagging lobsters at the close of the commercial season in your area, please send an email to lobtags@gmail.com. </PARAGRAPH unknownrel>
+  \\newline
+  \\newline
   <PARAGRAPH final>
+  \\newline
   \\newline
   I have included a one page information sheet on our tagging program. On the reverse side of this sheet is a form which can easily be used to record all required information on any tagged lobster you may catch in the future. This entire form can be sent to DFO Science at the end of the lobster season. </PARAGRAPH final>
   <PARAGRAPH end>

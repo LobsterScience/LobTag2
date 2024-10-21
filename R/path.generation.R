@@ -220,12 +220,7 @@ if(length(repath)>0){
   ## create paths
   x <- x %>% rename(PID=TAG_ID)
 
-  dftowrite = NULL
-  df2towrite = NULL
-  dxtowrite = NULL
 
-  count = 1
-  previd = ""
   if(nrow(x) == 0){base::message("No new paths to create!")}else{
 
     ################################################ prepare depth raster
@@ -264,7 +259,8 @@ if(length(repath)>0){
     XY1878 <- data.frame(lon = c(-60.35), lat = c(46.655))
     XY461 <- data.frame(lon = c(-59.685,-59.682,-59.685,-59.679,-59.72,-59.715,-59.71,-59.71,-59.71,-59.71,-59.71), lat = c(46.03,46.034,46.034,46.034,46.015,46.015,46.015,46.02,46.025,46.027,46.03))
     XY4348 <- data.frame(lon = c(-63.277,-63.277,-63.285),lat = c(44.625,44.627,44.627))
-    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348)
+    XY924 <- data.frame(lon = c(-61.055,-61.052,-61.05,-61.045,-61.045,-61.04,-61.035,-61.035,-61.055,-61.055),lat = c(45.495,45.495,45.495,45.495,45.49,45.49,45.49,45.495,45.5,45.502))
+    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924)
     # Create a SpatVector from the coordinates
     new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
     # Use extract() to find the cell numbers corresponding to the new land points
@@ -275,20 +271,50 @@ if(length(repath)>0){
 
     # Convert SpatRaster to RasterLayer
     r <- as(cost_surface, "Raster")
-     ## plot(r)
+    ## plot(r)
 
+    ### having any starting points on land will cause a pathing error
+    ### so need to check if any releases or recaptures fall on land in the raster
 
+    x_rel_coords <- x[, c("rel_lon", "rel_lat")]
+    x_rel_coords$rel_lon = as.numeric(x_rel_coords$rel_lon)
+    x_rel_coords$rel_lat = as.numeric(x_rel_coords$rel_lat)
+    rel_depth_values <- raster::extract(r, x_rel_coords)
+    x$rel_depth <- rel_depth_values
+    land_rels <- x %>% filter(rel_depth == Inf)
+
+    x_rec_coords <- x[, c("rec_lon", "rec_lat")]
+    x_rec_coords$rec_lon = as.numeric(x_rec_coords$rec_lon)
+    x_rec_coords$rec_lat = as.numeric(x_rec_coords$rec_lat)
+    rec_depth_values <- raster::extract(r, x_rec_coords)
+    x$rec_depth <- rec_depth_values
+    land_recs <- x %>% filter(rec_depth == Inf)
+
+    ## assume that most land points are the result of raster resolution, not reporting error, and change these cells to water:
+    land.rel.points <- land_rels %>% dplyr::select(rel_lon,rel_lat) %>% rename(x=rel_lon,y=rel_lat)
+    land.rec.points <- land_recs %>% dplyr::select(rec_lon,rec_lat) %>% rename(x=rec_lon,y=rec_lat)
+    land.points <- rbind(land.rel.points,land.rec.points)
+    land.points$x = as.numeric(land.points$x)
+    land.points$y = as.numeric(land.points$y)
+    land_cells <- cellFromXY(r, land.points)
+    r[land_cells] <- 1
+    ## this only changes the immediate cell; if any coordinates are more than one cell inland, pathing will still fail
 
     ### begin pathing
     #tr <- transition(r, mean, neighborhood)
     tr <- transition(r, function(x) 1/mean(x), directions=neighborhood)
-    if(type  == "random.walk"){
+      if(type  == "random.walk"){
       trans = geoCorrection(tr, type = "r", scl=FALSE)
     }
     if(type  == "least.cost"){
       trans = geoCorrection(tr, type = "c", scl=FALSE)
     }
     ###############################################
+    count = 1
+    previd = ""
+    dftowrite = NULL
+    df2towrite = NULL
+    dxtowrite = NULL
 
     x <- x %>% arrange(PID,REC_DATE)
     dat <- arrange(dat,TID)
@@ -306,11 +332,29 @@ if(length(repath)>0){
       if(any(start %in% NA)){return(base::message("ERROR! There are recaptured tags that don't have initial release coordinates!"))}
       end <- c(as.numeric(x$rec_lon[i]), as.numeric(x$rec_lat[i]))
 
-      if(abs(start[1] - end[1]) < res(trans)[1] && abs(start[2] - end[2]) < res(trans)[1] || is.na(cellFromXY(r, start)) || is.na(cellFromXY(r, end))){
-        AtoB = rbind(start, end)
-      }else{
-        AtoB = shortestPath(trans, start, end, output="SpatialLines")
+      ## if pathing fails at this point it's likely because the path crosses land, so handle error with message specifying the problem tag.
+       tryCatch({
+
+      AtoB <- NULL
+        if(abs(start[1] - end[1]) < res(trans)[1] && abs(start[2] - end[2]) < res(trans)[1] || is.na(cellFromXY(r, start)) || is.na(cellFromXY(r, end))){
+          AtoB = rbind(start, end)
+        }else{
+          AtoB = shortestPath(trans, start, end, output="SpatialLines")
+        }
+
+      if (is.null(AtoB)) {
+        stop("Path calculation failed: result is NULL")
       }
+
+      }, error = function(e) {
+        base::message(paste0("Pathing failed at tag: ",x$PID[i],"! Likely because the path crosses land. Paths not created. Check release and recapture coordinates for this tag and try again."))
+        break
+      }, finally = {
+
+      })
+
+
+
       cor = data.frame(coordinates(AtoB))
       names(cor) = c("x", "y")
       xrep = cor$x[1]
@@ -420,18 +464,19 @@ if(length(repath)>0){
 
 
 ## troubleshooting code
-#
+# #
   # library(dplyr)
   # library(raster)
   # library(gdistance)
   # library(ROracle)
+  # library(PBSmapping)
   # library(terra)
   #
   # db = "Oracle"
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
   # oracle.dbname = oracle.personal.server
-  # tags = "XY4348"
+  # tags = "all"
   # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
   # neighborhood = 8
   # type = "least.cost"
