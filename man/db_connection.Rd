@@ -4,7 +4,12 @@
 \alias{db_connection}
 \title{db_connection}
 \usage{
-db_connection()
+db_connection(
+  db = db,
+  oracle.user = oracle.user,
+  oracle.password = oracle.password,
+  oracle.dbname = oracle.dbname
+)
 }
 \description{
 establishes connection to databse of users choosing

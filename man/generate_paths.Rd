@@ -6,14 +6,15 @@
 \usage{
 generate_paths(
   db = NULL,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server,
   tags = "all",
   depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
   neighborhood = 8,
   type = "least.cost",
-  regen.paths = FALSE
+  regen.paths = FALSE,
+  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
+  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+    NULL,
+  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
 )
 }
 \description{

@@ -9,9 +9,10 @@ lobster.letters(
   db = "Oracle",
   only.unrewarded = T,
   output.location = NULL,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server
+  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
+  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+    NULL,
+  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
 )
 }
 \description{
