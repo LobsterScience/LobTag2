@@ -3,7 +3,16 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(db = NULL, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"), neighborhood = 8, type = "least.cost", regen.paths = FALSE){
+generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
+                           neighborhood = 8, type = "least.cost", regen.paths = FALSE,
+                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+   if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+    dir.create("C:/LOBTAG",showWarnings = F)
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -25,26 +34,14 @@ generate_paths <- function(db = NULL, oracle.user = oracle.personal.user, oracle
 ##########################################################################################################
   ## Check if path tables already exist and create them if they don't
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG",showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+db_connection()
 
   table_name <- "LBT_PATH"
 
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   if (result[[1]] == 0) {
@@ -70,7 +67,7 @@ generate_paths <- function(db = NULL, oracle.user = oracle.personal.user, oracle
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   if (result[[1]] == 0) {
@@ -105,18 +102,7 @@ generate_paths <- function(db = NULL, oracle.user = oracle.personal.user, oracle
   recheck=TRUE
 while(recheck){
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+  db_connection()
 
   query = paste0("SELECT * FROM LBT_RECAPTURES")
   recaptures <- dbSendQuery(con, query)
@@ -183,18 +169,8 @@ if(length(repath)>0){
   if(!regen.paths){
     base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")
   }
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+
+db_connection()
 
   for(i in repath){
     ## delete all single paths for tag
@@ -411,18 +387,7 @@ if(length(repath)>0){
 
     #add data to database
     ### open db connection
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{
-      con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+db_connection()
 
 
       if(db %in% "Oracle"){
@@ -453,10 +418,11 @@ if(length(repath)>0){
 
         print("New paths calculated and written to path tables.")
 
-      }else{
+      }else{if(db %in% "local"){
         dbWriteTable(con, "LBT_PATH", df2towrite, append = TRUE, row.names = FALSE)
         dbWriteTable(con, "LBT_PATHS", dxtowrite, append = TRUE, row.names = FALSE)
         print("New paths calculated and written to paths tables.")
+      }
         }
 
     dbDisconnect(con)

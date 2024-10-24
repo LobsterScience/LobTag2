@@ -5,12 +5,13 @@
 \title{generate_maps}
 \usage{
 generate_maps(
+  db = NULL,
   people = NULL,
   all.people = FALSE,
-  tag.IDs = NULL,
+  tags = NULL,
   all.tags = FALSE,
+  only.unrewarded = FALSE,
   map.token = mapbox.token,
-  db = "local",
   output.location = NULL,
   max.pixels = 8e+05,
   map.res = 0.9,

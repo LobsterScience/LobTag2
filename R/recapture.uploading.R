@@ -3,8 +3,14 @@
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
-upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server, backups = T){
+upload_recaptures <- function(db = NULL, backups = T,
+                              oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                              oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                              oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
 
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -27,26 +33,14 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
   ## Check if recaptures and people tables already exist and create if not
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG",showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+ db_connection()
 
   table_name <- "LBT_RECAPTURES"
 
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -89,7 +83,7 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
     ## look for existing table
     if(db %in% "Oracle"){
       query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-    }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+    }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
     result <- dbGetQuery(con, query)
     # If the table does not exist, create it
     if (result[[1]] == 0) {
@@ -283,16 +277,7 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
     submitted_data <- reactiveVal(data.frame(Tag_Prefix = character(), Tag_Number = numeric(), Date = character(), Person = character(), Person_2 = character(), Latitude = character(), Longitude = character()))
 
     # Connect to database
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+    db_connection()
 
     # Observer to check if Tag Prefix and Tag Number combination exists in the Oracle table
     observeEvent(c(input$tag_prefix, input$tag_number), {
@@ -428,7 +413,7 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
 
       if(db %in% "Oracle"){
         sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')", sep="")
-      }else{sql_1 <- paste0(
+      }else{if(db %in% "local")sql_1 <- paste0(
         "INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) ",
         "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ",
         lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ",
@@ -466,7 +451,7 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
           dbExecute(con, sql_2)
           #dbCommit(con)
 
-        }else{
+        }else{if(db %in% "local"){
           # Check if the person already exists in the LBT_PEOPLE table
           check_query <- paste("
   SELECT COUNT(*) as count
@@ -505,6 +490,7 @@ upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user, orac
           }
 
         }
+          }
 
       }
 
@@ -585,26 +571,14 @@ batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user
   ## Check if recaptures and people tables already exist and create if not
 
   # Connect to database
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG", showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+  db_connection()
 
   table_name <- "LBT_RECAPTURES"
 
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -648,7 +622,7 @@ batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -962,16 +936,7 @@ batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user
       table_name <- "LBT_RECAPTURES"
       people.tab.name <- "LBT_PEOPLE"
       # Connect to database
-      if(db %in% "Oracle"){
-        tryCatch({
-          drv <- DBI::dbDriver("Oracle")
-          con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-        }, warning = function(w) {
-        }, error = function(e) {
-          return(toJSON("Connection failed"))
-        }, finally = {
-        })
-      }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+      db_connection()
 
       ## check for already entered recapture events, then upload all new recaptures
       entered =NULL
@@ -1084,16 +1049,7 @@ batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user
     table_name <- "LBT_RECAPTURES"
     people.tab.name <- "LBT_PEOPLE"
     # Connect to database
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+    db_connection()
 
     ## check for already entered recapture events, then upload all new recaptures
     entered =NULL
@@ -1265,19 +1221,7 @@ batch_upload_recaptures <- function(db = NULL,oracle.user = oracle.personal.user
     }
 
   # Connect to database
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG", showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+  db_connection()
 
   ##update excel backups
     ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets

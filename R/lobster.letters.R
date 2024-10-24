@@ -4,9 +4,13 @@
 #' @import ROracle DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
 lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
-                           oracle.user = oracle.personal.user,
-                           oracle.password = oracle.personal.password,
-                           oracle.dbname = oracle.personal.server){
+                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## let user select output file location for maps
   if(is.null(output.location)){
@@ -101,18 +105,7 @@ lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, ou
   lettertxt = rewards.letter.fill()
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+db_connection()
 
 
   #initialize lobster databases

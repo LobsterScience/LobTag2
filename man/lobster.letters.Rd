@@ -7,6 +7,7 @@
 lobster.letters(
   people = NULL,
   db = "Oracle",
+  only.unrewarded = T,
   output.location = NULL,
   oracle.user = oracle.personal.user,
   oracle.password = oracle.personal.password,

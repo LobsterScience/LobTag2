@@ -5,8 +5,14 @@
 #' @export
 
 generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
-                          max.pixels = 800000, map.res = 0.9, inset.option = T, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
-                          oracle.dbname = oracle.personal.server){
+                          max.pixels = 800000, map.res = 0.9, inset.option = T,
+                          oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                          oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                          oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -40,34 +46,23 @@ generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NUL
   }
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      conn <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    conn <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+db_connection()
 
 
 
 ## bring in paths (and recaptures for reference)
 sql = paste0("SELECT * FROM LBT_PATH")
-path <- dbSendQuery(conn, sql)
+path <- dbSendQuery(con, sql)
 path <- fetch(path)
 sql = paste0("SELECT * FROM LBT_PATHS")
-paths <- dbSendQuery(conn, sql)
+paths <- dbSendQuery(con, sql)
 paths <- fetch(paths)
 sql = paste0("SELECT * FROM LBT_RECAPTURES")
-rec <- dbSendQuery(conn, sql)
+rec <- dbSendQuery(con, sql)
 rec <- fetch(rec)
 
 ##
-dbDisconnect(conn)
+dbDisconnect(con)
 
 ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
 paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
@@ -384,10 +379,16 @@ for (p in people){
 #' @description specific mapping function for mapping releases and returns by custom factor
 #' @export
 
-map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,group.by=NULL,all.releases = F, tag.prefix = NULL, add.paths = F,
-                          map.token = mapbox.token, db = NULL, output.location = NULL,
-                          oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
-                          oracle.dbname = oracle.personal.server, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T){
+map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
+                          tag.prefix = NULL, add.paths = F, map.token = mapbox.token, output.location = NULL,
+                          set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
+                          oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                          oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                          oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -419,27 +420,16 @@ map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,gr
   }
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      conn <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    conn <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
+db_connection()
 
   query = ifelse(is.null(tag.prefix),"SELECT * FROM LBT_RECAPTURES",paste0("SELECT * FROM LBT_RECAPTURES where TAG_PREFIX= ","'",tag.prefix,"'"))
-  recaptures <- dbSendQuery(conn, query)
+  recaptures <- dbSendQuery(con, query)
   recaptures <- fetch(recaptures)
 
   cap.tags <- recaptures$TAG_ID
   chosen.str <- paste0("('",paste(cap.tags, collapse ="','"),"')")
   query = ifelse(all.releases,"SELECT * FROM LBT_RELEASES", paste0("SELECT * FROM LBT_RELEASES where TAG_ID in ",chosen.str))
-  releases <- dbSendQuery(conn, query)
+  releases <- dbSendQuery(con, query)
   releases <- fetch(releases)
 
   select.factors <- c("TAG_ID")    ### minimal information that can be included
@@ -481,10 +471,10 @@ map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,gr
   if(add.paths){
     ## bring in paths
     sql = paste0("SELECT * FROM LBT_PATH")
-    path <- dbSendQuery(conn, sql)
+    path <- dbSendQuery(con, sql)
     path <- fetch(path)
     sql = paste0("SELECT * FROM LBT_PATHS")
-    paths <- dbSendQuery(conn, sql)
+    paths <- dbSendQuery(con, sql)
     paths <- fetch(paths)
 
     ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
@@ -493,7 +483,7 @@ map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,gr
 
 
   ##
-  dbDisconnect(conn)
+  dbDisconnect(con)
 
   ## include optional filter for specific value of mapping factor
   if(!is.null(filter.maps.for)){

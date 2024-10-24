@@ -4,7 +4,14 @@
 #' @description allows user to delete chosen tag recaptures and associated paths
 #' @export
 
-delete_recaptures <- function(db = NULL, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+delete_recaptures <- function(db = NULL,
+                              oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                              oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                              oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -108,18 +115,7 @@ delete_recaptures <- function(db = NULL, oracle.user = oracle.personal.user, ora
   server <- function(input, output, session) {
 
     ### open db connection
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{
-      con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+  db_connection()
 
     # Function to update message text with HTML for color
     update_message <- function(message, color = "black") {
