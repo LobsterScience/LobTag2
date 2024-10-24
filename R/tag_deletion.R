@@ -4,7 +4,7 @@
 #' @description allows user to delete chosen tag recaptures and associated paths
 #' @export
 
-delete_recaptures <- function(db = "local", oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+delete_recaptures <- function(db = NULL, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){

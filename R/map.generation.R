@@ -4,7 +4,7 @@
 #' @description creates maps of tag movement for participants
 #' @export
 
-generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, map.token = mapbox.token, db = "local", output.location = NULL,
+generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
                           max.pixels = 800000, map.res = 0.9, inset.option = T, oracle.user = oracle.personal.user, oracle.password = oracle.personal.password,
                           oracle.dbname = oracle.personal.server){
 
@@ -55,49 +55,53 @@ generate_maps <- function(people=NULL, all.people = FALSE, tags = NULL, all.tags
 
 
 
-## bring in paths
+## bring in paths (and recaptures for reference)
 sql = paste0("SELECT * FROM LBT_PATH")
 path <- dbSendQuery(conn, sql)
 path <- fetch(path)
 sql = paste0("SELECT * FROM LBT_PATHS")
 paths <- dbSendQuery(conn, sql)
 paths <- fetch(paths)
+sql = paste0("SELECT * FROM LBT_RECAPTURES")
+rec <- dbSendQuery(conn, sql)
+rec <- fetch(rec)
+
+##
+dbDisconnect(conn)
 
 ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
 paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
 
+## filtering arguments
+
 if(all.people){
   ## get all names who've recaptured tags
-  sql = paste0("SELECT * FROM LBT_RECAPTURES")
-  rec <- dbSendQuery(conn, sql)
-  rec <- fetch(rec)
   people <- unique(rec$PERSON)
 }
 if(all.tags){
-  ## get all names who've recaptured tags
-  sql = paste0("SELECT * FROM LBT_RECAPTURES")
-  rec <- dbSendQuery(conn, sql)
-  rec <- fetch(rec)
+  ## get all tags that have been recaptured
   tags <- unique(rec$TAG_ID)
 }
-
-##
-dbDisconnect(conn)
 
 if(!is.null(tags)){
   paths <- paths %>% filter(TID %in% tags)
   people <- unique((paths %>% filter(!REC_PERSON %in% NA))$REC_PERSON)
 }
 
-if(is.null(people) & is.null(tags)){base::message("No tags or people chosen to make maps for!")}
+if(is.null(people) & is.null(tags)){base::message("No tags or people chosen to make maps for!")}else{
+
 ## loops if there's more than one person
 for (p in people){
   person = p
 
-if(is.null(person)){base::message("No person chosen to make maps for!")}else{
-
   ### filter path data for chosen tags or tags recaptured by chosen person
   path.pers <- paths %>% filter(TID %in% (paths %>% filter(REC_PERSON %in% person))$TID)
+
+  ## if user chooses to only make maps for those people who haven't received rewards:
+  if(only.unrewarded){
+    rec.unrewarded <- rec %>% filter(PERSON %in% p, REWARDED %in% "no")
+    path.pers <- path.pers %>% filter(TID %in% rec.unrewarded$TAG_ID)
+  }
 
   #### Make sf objects
   sf_points <- sf::st_as_sf(path.pers, coords = c("LON","LAT"))
@@ -230,7 +234,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
     sf::st_crs(ext_sf) <- 4326
 
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
-                 map_token = map.token)
+                 map_token = map.token, map_dir = tempdir())
 
     base <- basemap_raster(ext_sf, map_res = map.res) #### forces basemap crs to be in 3857
 
@@ -251,7 +255,7 @@ if(is.null(person)){base::message("No person chosen to make maps for!")}else{
       }
 
     set_defaults(ext.inset, map_service = "mapbox",map_type = "satellite",
-                 map_token = map.token)
+                 map_token = map.token, map_dir = tempdir())
 
     inset <- basemap_raster(ext.inset_sf, map_res = 0.9) #### mapbox's default datum is mercator (3857)
 
@@ -592,7 +596,7 @@ map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,gr
     sf::st_crs(ext_sf) <- 4326
 
     set_defaults(ext_sf, map_service = "mapbox",map_type = "satellite",
-                 map_token = map.token)
+                 map_token = map.token, map_dir = tempdir())
 
     base <- basemap_raster(ext_sf, map_res = map.res) #### forces basemap crs to be in 3857
 
@@ -614,7 +618,7 @@ map_by_factor <- function(factor.from = NULL,map.by=NULL,filter.maps.for=NULL,gr
     }
 
     set_defaults(ext.inset, map_service = "mapbox",map_type = "satellite",
-                 map_token = map.token)
+                 map_token = map.token, map_dir = tempdir())
 
     inset <- basemap_raster(ext.inset_sf, map_res = 0.9) #### mapbox's default datum is mercator (3857)
 

@@ -224,7 +224,6 @@ if(length(repath)>0){
   if(nrow(x) == 0){base::message("No new paths to create!")}else{
 
     ################################################ prepare depth raster
-    trans = NULL
 
 
     r = rast(depth.raster.path)
@@ -238,10 +237,10 @@ if(length(repath)>0){
 
       ##for troubleshooting (can see land pixels closeup. Keep cropped but increase crop size when done; crop greatly improves function speed but too small runs risk of paths not having route to escape land):
       ###################
-      ymax = ymax+0.1
-      ymin = ymin-0.1
-      xmax=xmax+0.1
-      xmin=xmin-0.1
+      ymax = ymax+0.01
+      ymin = ymin-0.01
+      xmax=xmax+0.01
+      xmin=xmin-0.01
       ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
@@ -255,12 +254,13 @@ if(length(repath)>0){
     cost_surface <- classify(r, reclass_matrix)
 
     ################################### can directly edit cells to create land in problem areas
-    new_land_coords <- data.frame(lon = c(-59.81, -59.815, -59.805,-59.80,-59.80,-59.80), lat = c(46.125, 46.125,46.125,46.125,46.127,46.13))
+    new_land_coords <- data.frame(lon = c(-59.81, -59.815, -59.805,-59.80,-59.80,-59.80,-59.797), lat = c(46.125, 46.125,46.125,46.125,46.127,46.13,46.13))
     XY1878 <- data.frame(lon = c(-60.35), lat = c(46.655))
     XY461 <- data.frame(lon = c(-59.685,-59.682,-59.685,-59.679,-59.72,-59.715,-59.71,-59.71,-59.71,-59.71,-59.71), lat = c(46.03,46.034,46.034,46.034,46.015,46.015,46.015,46.02,46.025,46.027,46.03))
     XY4348 <- data.frame(lon = c(-63.277,-63.277,-63.285),lat = c(44.625,44.627,44.627))
     XY924 <- data.frame(lon = c(-61.055,-61.052,-61.05,-61.045,-61.045,-61.04,-61.035,-61.035,-61.055,-61.055),lat = c(45.495,45.495,45.495,45.495,45.49,45.49,45.49,45.495,45.5,45.502))
-    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924)
+    XY11175 <- data.frame(lon = c(-59.795,-59.79), lat = c(46.007,46.007))
+    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924,XY11175)
     # Create a SpatVector from the coordinates
     new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
     # Use extract() to find the cell numbers corresponding to the new land points
@@ -301,6 +301,7 @@ if(length(repath)>0){
     ## this only changes the immediate cell; if any coordinates are more than one cell inland, pathing will still fail
 
     ### begin pathing
+    trans = NULL
     #tr <- transition(r, mean, neighborhood)
     tr <- transition(r, function(x) 1/mean(x), directions=neighborhood)
       if(type  == "random.walk"){
@@ -476,7 +477,7 @@ if(length(repath)>0){
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
   # oracle.dbname = oracle.personal.server
-  # tags = "all"
+  # tags = "XY11175"
   # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
   # neighborhood = 8
   # type = "least.cost"

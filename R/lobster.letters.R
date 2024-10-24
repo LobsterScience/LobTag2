@@ -3,7 +3,7 @@
 #' @description  create reward letters for fishers who report tags, letters contain map and text.
 #' @import ROracle DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
-lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
+lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
                            oracle.user = oracle.personal.user,
                            oracle.password = oracle.personal.password,
                            oracle.dbname = oracle.personal.server){
@@ -117,14 +117,18 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
 
   #initialize lobster databases
   reldb = "LBT_RELEASES"
-  captdb = "LBT_RECAPTUREs"
+  captdb = "LBT_RECAPTURES"
   peopdb = "LBT_PEOPLE"
   #pathdb = paste("LOBSTER",".","LBT_PATH", sep = "")
 
-  #New lobster code (Geraint)
   query = paste("SELECT * FROM",captdb)
   capt.quer <- ROracle::dbSendQuery(con, query)
   captures <- ROracle::fetch(capt.quer)
+
+  ## filter for only those that haven't yet received their reward
+  if(only.unrewarded){
+    captures <- captures %>% filter(REWARDED %in% "no")
+  }
 
   ## for selective letter generation
   if(!is.null(people)){captures <- captures %>% filter(PERSON  %in% people)}
@@ -219,14 +223,14 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
           if(length(unique(per$data$TAG_ID))>1){
             if(length(unique(per$data$YEAR1))>1){
               per$info = gsub("<was/were/wereall>", "were", per$info)
-              per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(stri_reverse(sub(",", "dna ", stri_reverse(paste0(unique(per$data$YEAR1), collapse = ", ")))), " seasons", sep = ""), per$info)
+              per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(stri_reverse(sub(",", "dna ", stri_reverse(paste0(sort(unique(per$data$YEAR1)), collapse = ", ")))), " seasons", sep = ""), per$info)
             }else{
               per$info = gsub("<was/were/wereall>", "were all", per$info)
-              per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(unique(per$data$YEAR1), " season", sep = ""), per$info)
+              per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(sort(unique(per$data$YEAR1)), " season", sep = ""), per$info)
             }
           }else{
             per$info = gsub("<was/were/wereall>", "was", per$info)
-            per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(unique(per$data$YEAR1), " season", sep = ""), per$info)
+            per$info = gsub("<yeartagged/yearstagged/season/seasons>", paste(sort(unique(per$data$YEAR1)), " season", sep = ""), per$info)
           }
 
           capbefore = F
@@ -333,7 +337,7 @@ lobster.letters = function(people = NULL, db = "Oracle", output.location = NULL,
         #per$mapdisclaimer = getBetween(lettertxt, "PARAGRAPH mapdisclaimer")   ### not needed anymore once we got better maps
 
 
-        generate_maps(people = per$name, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
+        generate_maps(people = per$name, only.unrewarded = T, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
 
         charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
         c <- c()
