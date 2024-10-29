@@ -4,9 +4,10 @@
 #' @export
 
 upload_releases <- function(db = NULL,
-                            oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                            oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                            oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL) {
+                            oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
+                            oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
+                            oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL) {
+
   if(db %in% c("local","Local","LOCAL")){
     db = "local"
   }
@@ -31,7 +32,7 @@ upload_releases <- function(db = NULL,
   ##################################################################################################
   # Check if releases table already exists and create if not
 
-  db_connection()
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   table_name <- "LBT_RELEASES"
 
@@ -339,7 +340,7 @@ if(!return_error & return_warning){
         ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
         ### open db connection
-       db_connection()
+       db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
         ## check for already entered tags, then upload all new tag entries
         entered =NULL
@@ -431,7 +432,7 @@ if(!return_error & return_warning){
   ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
   ### open db connection
-  db_connection()
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   ## check for already entered tags, then upload all new tag entries
   entered =NULL

@@ -46,7 +46,7 @@ generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NUL
   }
 
   ### open db connection
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
 
 
@@ -420,7 +420,7 @@ map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.map
   }
 
   ### open db connection
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   query = ifelse(is.null(tag.prefix),"SELECT * FROM LBT_RECAPTURES",paste0("SELECT * FROM LBT_RECAPTURES where TAG_PREFIX= ","'",tag.prefix,"'"))
   recaptures <- dbSendQuery(con, query)

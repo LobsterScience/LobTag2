@@ -34,7 +34,7 @@ generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.f
 ##########################################################################################################
   ## Check if path tables already exist and create them if they don't
   ### open db connection
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   table_name <- "LBT_PATH"
 
@@ -102,7 +102,7 @@ db_connection()
   recheck=TRUE
 while(recheck){
   ### open db connection
-  db_connection()
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   query = paste0("SELECT * FROM LBT_RECAPTURES")
   recaptures <- dbSendQuery(con, query)
@@ -170,7 +170,7 @@ if(length(repath)>0){
     base::message("There are new recaptures of tags that are earlier in time than the most recent recaptures for those tags. Deleting and regenerating paths for these tags...")
   }
 
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   for(i in repath){
     ## delete all single paths for tag
@@ -213,10 +213,10 @@ db_connection()
 
       ##for troubleshooting (can see land pixels closeup. Keep cropped but increase crop size when done; crop greatly improves function speed but too small runs risk of paths not having route to escape land):
       ###################
-      ymax = ymax+0.01
-      ymin = ymin-0.01
-      xmax=xmax+0.01
-      xmin=xmin-0.01
+      ymax = ymax+0.1
+      ymin = ymin-0.1
+      xmax=xmax+0.1
+      xmin=xmin-0.1
       ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
@@ -236,7 +236,13 @@ db_connection()
     XY4348 <- data.frame(lon = c(-63.277,-63.277,-63.285),lat = c(44.625,44.627,44.627))
     XY924 <- data.frame(lon = c(-61.055,-61.052,-61.05,-61.045,-61.045,-61.04,-61.035,-61.035,-61.055,-61.055),lat = c(45.495,45.495,45.495,45.495,45.49,45.49,45.49,45.495,45.5,45.502))
     XY11175 <- data.frame(lon = c(-59.795,-59.79), lat = c(46.007,46.007))
-    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924,XY11175)
+    XY965 <- data.frame(lon = c(-60.955,-60.955,-61.00,-61.00,-61.00,-61.005,-61.001,-61.01,-60.99,-60.995), lat = c(45.51,45.505,45.475,45.48,45.477,45.48,45.48,45.48,45.475,45.475))
+    XY845<- data.frame(lon = c(-62.76,-62.765), lat = c(44.715,44.715))
+    XY798 <- data.frame(lon = c(-61.89,-61.89,-61.89), lat = c(45.025,45.03,45.027))
+    XY915 <- data.frame(lon = c(-62.8), lat = c(44.715))
+
+
+    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924,XY11175,XY965,XY845,XY798,XY915)
     # Create a SpatVector from the coordinates
     new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
     # Use extract() to find the cell numbers corresponding to the new land points
@@ -387,7 +393,7 @@ db_connection()
 
     #add data to database
     ### open db connection
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
 
       if(db %in% "Oracle"){
@@ -443,7 +449,7 @@ db_connection()
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
   # oracle.dbname = oracle.personal.server
-  # tags = "XY11175"
+  # tags = "XY965"
   # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
   # neighborhood = 8
   # type = "least.cost"

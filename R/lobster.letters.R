@@ -105,7 +105,7 @@ lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, ou
   lettertxt = rewards.letter.fill()
 
   ### open db connection
-db_connection()
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
 
   #initialize lobster databases

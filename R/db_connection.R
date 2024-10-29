@@ -4,11 +4,12 @@
 #' @description establishes connection to databse of users choosing
 #' @export
 
-db_connection = function(db = db, oracle.user = oracle.user, oracle.password = oracle.password, oracle.dbname = oracle.dbname){
+db_connection = function(db = NULL, oracle.user = NULL, oracle.password = NULL, oracle.dbname = NULL){
+
   if(db %in% "Oracle"){
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+      con <<- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
     }, warning = function(w) {
     }, error = function(e) {
       return(toJSON("Connection failed"))
@@ -17,7 +18,7 @@ db_connection = function(db = db, oracle.user = oracle.user, oracle.password = o
   }else{
     if(db %in% c("local","Local","LOCAL")){
       dir.create("C:/LOBTAG",showWarnings = F)
-      con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
+      con <<- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
     }
   }
 }

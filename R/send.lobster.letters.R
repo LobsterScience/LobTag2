@@ -55,9 +55,6 @@ Dartmouth, NS B2Y 4A2"
       return(toJSON("Connection failed"))
     }, finally = {
     })
-  }else{
-    dir.create("C:/LOBTAG", showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
   }
 
   # Define UI
@@ -130,9 +127,6 @@ Dartmouth, NS B2Y 4A2"
           return(toJSON("Connection failed"))
         }, finally = {
         })
-      }else{
-        dir.create("C:/LOBTAG", showWarnings = F)
-        con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
       }
 
       # Extract name from PDF file name (assuming it's in the format "Name_Surname.pdf")
@@ -171,6 +165,35 @@ Dartmouth, NS B2Y 4A2"
 
       ## create and send the email
       send.email(fisher_name = file_name(),email_to = user_email(),total_attach = current_pdf)
+
+      ## update REWARDED status for now rewarded tags
+      map.files <- list.files(paste0(dirname(input.location),"/maps"),full.names = T)
+      sent.tags <- map.files[grep(file_name(), map.files)]
+      sent.tags <- gsub(file_name(),"",basename(sent.tags))
+      sent.tags <- gsub(".pdf","",sent.tags)
+
+      if(db %in% "Oracle"){
+        tryCatch({
+          drv <- DBI::dbDriver("Oracle")
+          con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
+        }, warning = function(w) {
+        }, error = function(e) {
+          return(toJSON("Connection failed"))
+        }, finally = {
+        })
+      }
+
+      for (i in sent.tags){
+          update_query <- sprintf("
+    UPDATE LBT_RECAPTURES
+    SET REWARDED = '%s'
+    WHERE TAG_ID = '%s' AND PERSON = '%s'",
+    "yes",i,file_name())
+
+          # Execute the update query in Oracle
+          dbExecute(con, update_query)
+      }
+      dbCommit(con)
 
       # Move the current PDF to the sent folder
       sent_folder <- file.path(input.location, "sent")

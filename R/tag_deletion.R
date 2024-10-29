@@ -115,7 +115,7 @@ delete_recaptures <- function(db = NULL,
   server <- function(input, output, session) {
 
     ### open db connection
-  db_connection()
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     # Function to update message text with HTML for color
     update_message <- function(message, color = "black") {
