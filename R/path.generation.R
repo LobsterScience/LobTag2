@@ -1,5 +1,5 @@
 #' @title generate_paths
-#' @import dplyr RSQLite raster gdistance PBSmapping terra
+#' @import dplyr RSQLite raster gdistance PBSmapping terra sf
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
@@ -236,7 +236,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     XY4348 <- data.frame(lon = c(-63.277,-63.277,-63.285),lat = c(44.625,44.627,44.627))
     XY924 <- data.frame(lon = c(-61.055,-61.052,-61.05,-61.045,-61.045,-61.04,-61.035,-61.035,-61.055,-61.055),lat = c(45.495,45.495,45.495,45.495,45.49,45.49,45.49,45.495,45.5,45.502))
     XY11175 <- data.frame(lon = c(-59.795,-59.79), lat = c(46.007,46.007))
-    XY965 <- data.frame(lon = c(-60.955,-60.955,-61.00,-61.00,-61.00,-61.005,-61.001,-61.01,-60.99,-60.995), lat = c(45.51,45.505,45.475,45.48,45.477,45.48,45.48,45.48,45.475,45.475))
+    XY965 <- data.frame(lon = c(-60.955,-60.955,-61.00,-61.00,-61.00,-61.005), lat = c(45.51,45.505,45.475,45.48,45.477,45.48))
     XY845<- data.frame(lon = c(-62.76,-62.765), lat = c(44.715,44.715))
     XY798 <- data.frame(lon = c(-61.89,-61.89,-61.89), lat = c(45.025,45.03,45.027))
     XY915 <- data.frame(lon = c(-62.8), lat = c(44.715))
@@ -249,7 +249,23 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     land_cells <- cellFromXY(cost_surface, as.matrix(new_land_coords))
     # Set the identified cells to Inf (land)
     cost_surface[land_cells] <- Inf
-    ###################################
+    ##################################
+
+    ##################################
+    #### Import any additional saved land polygons drawn by user and add these as land:
+    if(file.exists("C:/LOBTAG/data/new_land_coords.rds")){
+    coords_table <- readRDS(file = "C:/LOBTAG/data/new_land_coords.rds")
+    # Convert drawn polygons (in coords_table) to an sf object and then to SpatVector
+    coords_list <- split(coords_table, coords_table$polygon_id)
+    polygon_list <- lapply(coords_list, function(coords) {
+      st_polygon(list(as.matrix(coords[, c("lon", "lat")])))
+    })
+    polygon_sf <- st_sfc(polygon_list, crs = st_crs(cost_surface))
+    new_land_polygons <- vect(polygon_sf)
+
+    # Mask the cost surface raster within the polygon areas
+    cost_surface <- mask(cost_surface, new_land_polygons,inverse=T, updatevalue = Inf)
+    }
 
     # Convert SpatRaster to RasterLayer
     r <- as(cost_surface, "Raster")
@@ -445,7 +461,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   # library(PBSmapping)
   # library(terra)
   #
-  # db = "Oracle"
+  # db = "local"
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
   # oracle.dbname = oracle.personal.server

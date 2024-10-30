@@ -6,10 +6,13 @@
 \usage{
 batch_upload_recaptures(
   db = NULL,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server,
-  backups = T
+  backups = T,
+  oracle.user = if (exists("oracle.personal.user", inherits = T)) oracle.personal.user
+    else NULL,
+  oracle.password = if (exists("oracle.personal.password", inherits = T))
+    oracle.personal.password else NULL,
+  oracle.dbname = if (exists("oracle.personal.server", inherits = T))
+    oracle.personal.server else NULL
 )
 }
 \description{

@@ -6,10 +6,12 @@
 \usage{
 upload_releases(
   db = NULL,
-  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
-  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
-    NULL,
-  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
+  oracle.user = if (exists("oracle.personal.user", inherits = T)) oracle.personal.user
+    else NULL,
+  oracle.password = if (exists("oracle.personal.password", inherits = T))
+    oracle.personal.password else NULL,
+  oracle.dbname = if (exists("oracle.personal.server", inherits = T))
+    oracle.personal.server else NULL
 )
 }
 \description{

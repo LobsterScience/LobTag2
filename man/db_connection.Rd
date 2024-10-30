@@ -5,10 +5,10 @@
 \title{db_connection}
 \usage{
 db_connection(
-  db = db,
-  oracle.user = oracle.user,
-  oracle.password = oracle.password,
-  oracle.dbname = oracle.dbname
+  db = NULL,
+  oracle.user = NULL,
+  oracle.password = NULL,
+  oracle.dbname = NULL
 )
 }
 \description{
