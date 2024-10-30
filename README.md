@@ -27,9 +27,8 @@ Other Included data files (for mapping) found in
 
 system.file("data", package = "LobTag2"):
 
-NS_extent   ## default basemap to use for reference inset map when making maps. You can choose to draw your own when running generate_maps().
-depthraster2.tif   ## depth raster used for drawing probable paths
-
+gebco_2024.tif   ## depth raster used for drawing probable paths
+knit_rewards.Rmd ## RMarkdown file used for creating lobster letters
 
 Other possible dependency issues:
 vctrs
