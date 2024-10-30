@@ -330,7 +330,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
         #per$mapdisclaimer = getBetween(lettertxt, "PARAGRAPH mapdisclaimer")   ### not needed anymore once we got better maps
 
 
-        generate_maps(people = per$name, only.unrewarded = T, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
+        generate_maps(people = per$name, only.unrewarded = only.unrewarded, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
 
         charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
         c <- c()
