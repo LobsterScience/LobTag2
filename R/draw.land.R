@@ -1,6 +1,6 @@
 
 #' @title draw_land
-#' @import dplyr sf shiny terra leaflet leaflet.extras
+#' @import dplyr sf shiny leaflet leaflet.extras
 #' @description Allows user to draw and save polygons that get automatically added as land when they use LobTag2 pathing functions
 #' @export
 
