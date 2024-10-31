@@ -11,6 +11,7 @@ LazyData: true
 RoxygenNote: 7.2.3
 Imports:
     dplyr,
+    ROracle
     RSQLite,
     DBI,
     shiny,
@@ -24,7 +25,15 @@ Imports:
     ggplot2,
     ggsflabel,
     basemaps,
-    readxl
-    
+    readxl,
+    ggspatial,
+    gmailr,
+    leaflet,
+    leaflet.extras,
+    lubridate,
+    openxlsx,
+    rmarkdown,
+    stringi,
+    terra
 
     
