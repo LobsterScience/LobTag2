@@ -20,9 +20,11 @@ send.lobster.letters <- function(db = "Oracle",
     #body_main = "Thanks for your participation in the lobster tagging program.\nPlease see attached report for movement information about the tagged lobster(s) you reported."
     body_main = "Thanks for your participation in the lobster tagging program. Please see attached tag recapture report for information on the tag(s) that you reported to us.
 
-Undererstanding how fast lobsters grow in the wild is difficult but tagged lobster measurements are very helpful in determining this. For future tag recaptures, if you are able to share a picture of the lobster with the measuring guage laid on its back, we can use this to determine lobster growth.
+Knowing how fast lobsters grow is difficult, so it's also much appreciated whenever you're able to include a picture of the lobster with the measuring guage laid on its back, as this helps us determine growth rates.
 
-Much appreciated.
+Your tag recapture report shows lobsters you reported this season, but if you ever need us to resend your reports from previous seasons, just let us know at this email!
+
+Take care.
 
 DFO Lobster Science Team
 Bedford Institute of Oceanography,

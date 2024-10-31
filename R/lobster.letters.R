@@ -60,7 +60,7 @@ lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, ou
   <PARAGRAPH consider>
   \\newline
   \\newline
-  Letting us know if tagged lobsters are released or retained is helpful; additional knowledge will be gained by tracking subsequent recaptures of individual lobsters over their lifespan.</PARAGRAPH consider>
+  Letting us know if tagged lobsters are released or retained is helpful. Additional knowledge will be gained by tracking subsequent recaptures of individual lobsters over their lifespan.</PARAGRAPH consider>
   <PARAGRAPH pickup>
   \\newline
   \\newline
