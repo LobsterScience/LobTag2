@@ -61,9 +61,9 @@ for(j in 1:length(charts)){
   pagecount = j
 }
 
-cat("![](C:\\bio\\LobTag\\inst\\extdata\\rewards\\TagSheet1.pdf)")
+cat("![](C:\\LOBTAG\\extdata\\rewards\\TagSheet1.pdf)")
 cat(' \\newpage ')
-cat("![](C:\\bio\\LobTag\\inst\\extdata\\rewards\\TagSheet2.pdf)")
+cat("![](C:\\LOBTAG\\extdata\\rewards\\TagSheet2.pdf)")
 
 ```
 
