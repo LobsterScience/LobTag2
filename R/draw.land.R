@@ -15,7 +15,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Initialize leaflet map with drawing options
   output$mymap <- renderLeaflet({
-    leaflet() %>%
+    leaflet(options = leafletOptions(crs = leafletCRS(crsClass = "L.CRS.EPSG3857"))) %>%
       addTiles() %>%
       addDrawToolbar(
         targetGroup = "drawn",
