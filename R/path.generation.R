@@ -213,10 +213,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
       ##for troubleshooting (can see land pixels closeup. Keep cropped but increase crop size when done; crop greatly improves function speed but too small runs risk of paths not having route to escape land):
       ###################
-      ymax = ymax+0.1
-      ymin = ymin-0.1
-      xmax=xmax+0.1
-      xmin=xmin-0.1
+      ymax = ymax+0.7
+      ymin = ymin-0.7
+      xmax=xmax+0.7
+      xmin=xmin-0.7
       ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
@@ -240,9 +240,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     XY845<- data.frame(lon = c(-62.76,-62.765), lat = c(44.715,44.715))
     XY798 <- data.frame(lon = c(-61.89,-61.89,-61.89), lat = c(45.025,45.03,45.027))
     XY915 <- data.frame(lon = c(-62.8), lat = c(44.715))
+    XY4087 <- data.frame(lon = c(-63.0), lat = c(44.705))
 
 
-    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924,XY11175,XY965,XY845,XY798,XY915)
+    new_land_coords <- rbind(new_land_coords,XY1878,XY461,XY4348,XY924,XY11175,XY965,XY845,XY798,XY915,XY4087)
     # Create a SpatVector from the coordinates
     new_land_points <- vect(new_land_coords, crs = crs(cost_surface))
     # Use extract() to find the cell numbers corresponding to the new land points
@@ -460,7 +461,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   # library(ROracle)
   # library(PBSmapping)
   # library(terra)
-  #
+  # library(sf)
   # db = "local"
   # oracle.user = oracle.personal.user
   # oracle.password = oracle.personal.password
@@ -470,6 +471,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   # neighborhood = 8
   # type = "least.cost"
   # regen.paths = T
+  #a <- readRDS("C:/LOBTAG/data/new_land_coords.rds")
 
   ##generate_paths(db = "Oracle",tags = "XY461", regen.paths = T)
   ##generate_maps(db="Oracle",tag.IDs = "XY461")
