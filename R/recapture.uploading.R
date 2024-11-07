@@ -579,6 +579,10 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
                                     oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
                                     oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL){
 
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
+
   ## Check if recaptures and people tables already exist and create if not
 
   # Connect to database
