@@ -5,10 +5,12 @@
 \title{upload_recaptures}
 \usage{
 upload_recaptures(
-  db = "local",
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server
+  db = NULL,
+  backups = T,
+  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
+  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+    NULL,
+  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
 )
 }
 \description{

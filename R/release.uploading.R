@@ -3,7 +3,14 @@
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+upload_releases <- function(db = NULL,
+                            oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
+                            oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
+                            oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL) {
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -24,27 +31,15 @@ upload_releases <- function(db = "local",oracle.user = oracle.personal.user, ora
   ##################################################################################################
   ##################################################################################################
   # Check if releases table already exists and create if not
-if(db %in% "Oracle"){
-  tryCatch({
-    drv <- DBI::dbDriver("Oracle")
-    con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-  }, warning = function(w) {
-  }, error = function(e) {
-    return(toJSON("Connection failed"))
-  }, finally = {
-  })
-  }else{
-    dir.create("C:/LOBTAG", showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-  }
 
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   table_name <- "LBT_RELEASES"
 
   ## look for existing table
   if(db %in% "Oracle"){
   query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
 
@@ -95,7 +90,7 @@ if(db %in% "Oracle"){
 ###################################################################### MAIN FUNCTION:
 
 ## Allow user to choose data file to upload
-dlg_message("In the following window, choose a csv file containing your releases data")
+dlg_message("In the following window, choose an xlsx file containing your releases data")
 file_path <- dlg_open(filter = dlg_filters["xls",])$res
 #releases <- read.csv(file_path, na.strings = "")
 releases <- read_xlsx(file_path, na = c("","NA"))
@@ -345,16 +340,7 @@ if(!return_error & return_warning){
         ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
         ### open db connection
-        if(db %in% "Oracle"){
-          tryCatch({
-            drv <- DBI::dbDriver("Oracle")
-            con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-          }, warning = function(w) {
-          }, error = function(e) {
-            return(toJSON("Connection failed"))
-          }, finally = {
-          })
-        }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+       db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
         ## check for already entered tags, then upload all new tag entries
         entered =NULL
@@ -446,16 +432,7 @@ if(!return_error & return_warning){
   ###### db UPLOAD HERE. Check that entry doesn't already exist before uploading
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   ## check for already entered tags, then upload all new tag entries
   entered =NULL

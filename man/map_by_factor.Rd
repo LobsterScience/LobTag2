@@ -5,19 +5,25 @@
 \title{map_by_factor}
 \usage{
 map_by_factor(
+  db = NULL,
+  factor.from = NULL,
   map.by = NULL,
-  filter.for = NULL,
+  filter.maps.for = NULL,
+  group.by = NULL,
   all.releases = F,
   tag.prefix = NULL,
   add.paths = F,
   map.token = mapbox.token,
-  db = "local",
   output.location = NULL,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server,
   set.output = T,
-  set.inset = T
+  set.inset = T,
+  max.pixels = 8e+05,
+  map.res = 0.9,
+  inset.map = T,
+  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
+  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+    NULL,
+  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
 )
 }
 \description{

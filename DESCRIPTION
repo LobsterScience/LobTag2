@@ -1,16 +1,17 @@
 Package: LobTag2
 Type: Package
-Title: Functions for creating and managing tagging databases, with mapping functionality. 
+Title: Functions for creating and managing tagging databases, with mapping functionality
 Version: 0.1.0
 Author: Geraint Element, inspired by LobTag by Brent Cameron
 Maintainer: The package maintainer <yourself@somewhere.net>
-Description: Functions allow controlled uploading of releases and recaptures data with error checking, to create an SQL based local or Oracle database. Additional functions generate plausible paths of animal movement using raster depth maps. Additional functions allow the user to generate detailed maps of this movement.
+Description: Functions allow controlled uploading of releases and recaptures data with error checking, to create an SQL-based local or Oracle database. Additional functions generate plausible paths of animal movement using raster depth maps. Additional functions allow the user to generate detailed maps of this movement.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.2.3
 Imports:
     dplyr,
+    ROracle,
     RSQLite,
     DBI,
     shiny,
@@ -24,7 +25,13 @@ Imports:
     ggplot2,
     ggsflabel,
     basemaps,
-    readxl
-    
-
-    
+    readxl,
+    ggspatial,
+    gmailr,
+    leaflet,
+    leaflet.extras,
+    lubridate,
+    openxlsx,
+    rmarkdown,
+    stringi,
+    terra

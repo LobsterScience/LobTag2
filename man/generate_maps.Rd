@@ -5,16 +5,21 @@
 \title{generate_maps}
 \usage{
 generate_maps(
+  db = NULL,
   people = NULL,
   all.people = FALSE,
-  tag.IDs = NULL,
+  tags = NULL,
   all.tags = FALSE,
+  only.unrewarded = FALSE,
   map.token = mapbox.token,
-  db = "local",
   output.location = NULL,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server
+  max.pixels = 8e+05,
+  map.res = 0.9,
+  inset.option = T,
+  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
+  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+    NULL,
+  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
 )
 }
 \description{

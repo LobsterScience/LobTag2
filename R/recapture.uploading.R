@@ -1,10 +1,16 @@
 #' @title upload_recaptures
-#' @import dplyr RSQLite DBI shiny shinyjs svDialogs
+#' @import dplyr RSQLite DBI shiny shinyjs svDialogs openxlsx
 #' @description allows individual or batch uploading of recapture data
 #' @export
 
-upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+upload_recaptures <- function(db = NULL, backups = T,
+                              oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
+                              oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
+                              oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
 
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## only install / load ROracle if the user chooses Oracle functionality
   if(db %in% "Oracle"){
@@ -27,26 +33,14 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
   ## Check if recaptures and people tables already exist and create if not
 
   ### open db connection
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG",showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   table_name <- "LBT_RECAPTURES"
 
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -89,7 +83,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
     ## look for existing table
     if(db %in% "Oracle"){
       query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-    }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+    }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
     result <- dbGetQuery(con, query)
     # If the table does not exist, create it
     if (result[[1]] == 0) {
@@ -119,6 +113,18 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
 ####################################################################################################
 ######################################################################## Main Function:
+  ## set backups location
+    if(backups){
+      if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
+        backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+      }else{
+        dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
+        backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
+      }
+
+    }
+
+
   # Define UI for application
   ui <- fluidPage(
 
@@ -271,16 +277,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
     submitted_data <- reactiveVal(data.frame(Tag_Prefix = character(), Tag_Number = numeric(), Date = character(), Person = character(), Person_2 = character(), Latitude = character(), Longitude = character()))
 
     # Connect to database
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+    db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     # Observer to check if Tag Prefix and Tag Number combination exists in the Oracle table
     observeEvent(c(input$tag_prefix, input$tag_number), {
@@ -388,10 +385,35 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
       # Generate TAG_ID
       tag_id <- paste(tag_prefix, tag_number, sep = "")
 
-      # Prepare SQL insert statement
+      # Check if recapture exists and if not, Prepare SQL insert statement
+
+      query <- paste("SELECT * FROM LBT_RECAPTURES WHERE TAG_ID = '",tag_id,"' AND REC_DATE = '",date,"' AND PERSON = '",person,"'",  sep = "")
+      result <- dbGetQuery(con, query)
+      if(nrow(result)<1){
+
+        # Clear input fields
+        shinyjs::reset("tag_prefix")
+        shinyjs::reset("tag_number")
+        shinyjs::reset("date")
+        shinyjs::reset("person")
+        shinyjs::reset("person2")
+        shinyjs::reset("lat_deg")
+        shinyjs::reset("lat_dec_min")
+        shinyjs::reset("long_deg")
+        shinyjs::reset("long_dec_min")
+        shinyjs::reset("depth_fathoms")
+        shinyjs::reset("released")
+        shinyjs::reset("captain")
+        shinyjs::reset("vessel")
+        shinyjs::reset("management_area")
+        shinyjs::reset("capture_length")
+        shinyjs::reset("sex")
+        shinyjs::reset("egg_state")
+        shinyjs::reset("comments")
+
       if(db %in% "Oracle"){
         sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')", sep="")
-      }else{sql_1 <- paste0(
+      }else{if(db %in% "local")sql_1 <- paste0(
         "INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) ",
         "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ",
         lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ",
@@ -429,7 +451,7 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
           dbExecute(con, sql_2)
           #dbCommit(con)
 
-        }else{
+        }else{if(db %in% "local"){
           # Check if the person already exists in the LBT_PEOPLE table
           check_query <- paste("
   SELECT COUNT(*) as count
@@ -468,13 +490,16 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
           }
 
         }
+          }
 
       }
 
+      ## commit additions to dbase
+      dbCommit(con)
 
       # Update status
       output$status <- renderText({
-        "Tags to be uploaded to database. Close this window to complete upload."
+        "The following tag recaptures have been uploaded to the database:"
       })
 
       # Add submitted data to the table
@@ -483,31 +508,47 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
       updated_data <- rbind(current_data, new_row)
       submitted_data(updated_data)
 
-      # Clear input fields
-      shinyjs::reset("tag_prefix")
-      shinyjs::reset("tag_number")
-      shinyjs::reset("date")
-      shinyjs::reset("person")
-      shinyjs::reset("person2")
-      shinyjs::reset("lat_deg")
-      shinyjs::reset("lat_dec_min")
-      shinyjs::reset("long_deg")
-      shinyjs::reset("long_dec_min")
-      shinyjs::reset("depth_fathoms")
-      shinyjs::reset("released")
-      shinyjs::reset("captain")
-      shinyjs::reset("vessel")
-      shinyjs::reset("management_area")
-      shinyjs::reset("capture_length")
-      shinyjs::reset("sex")
-      shinyjs::reset("egg_state")
-      shinyjs::reset("comments")
-    })
+      # Render submitted data
+      output$submitted_data <- renderTable({
+        submitted_data()[,1:7]
+      })
 
-    # Render submitted data
-    output$submitted_data <- renderTable({
-      submitted_data()[,1:7]
-    })
+      ##update excel backups
+      delay(500,
+            if(backups){
+              ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE on shared drive
+              rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+              rec.tab <- fetch(rec.tab)
+              peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+              peep.tab <- fetch(peep.tab)
+              # reformat recaptures back to loading style so they can easily be reuploaded to database:
+              rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
+              rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
+              peep.tab <- peep.tab %>% rename(PERSON = NAME)
+              rec.tab <- left_join(rec.tab,peep.tab)
+              rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
+
+              if(is.null(oracle.user))oracle.user <- ""
+              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+
+              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+              print(paste0("Data backups stored in ",backup.dir))
+            }
+      )
+
+
+
+      }else{
+
+        # Update status
+        output$status <- renderText({
+          paste("A recapture of tag",tag_id,"on",date,"by",person,"already exists! Recapture cannot be added.")
+        })
+
+      }
+
+      }) ## end of Submit observation
+
 
     # Close Oracle connection on app exit
     session$onSessionEnded(function() {
@@ -530,34 +571,29 @@ upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, o
 
 
 #' @title batch_upload_recaptures
-#' @import dplyr ROracle DBI shiny DT svDialogs readxl
+#' @import dplyr ROracle DBI shiny DT svDialogs readxl openxlsx
 #' @description batch uploads tag recaptures data
 #' @export
-batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.user, oracle.password = oracle.personal.password, oracle.dbname = oracle.personal.server){
+batch_upload_recaptures <- function(db = NULL, backups = T,
+                                    oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
+                                    oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
+                                    oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL){
+
+  if(db %in% c("local","Local","LOCAL")){
+    db = "local"
+  }
 
   ## Check if recaptures and people tables already exist and create if not
 
   # Connect to database
-  if(db %in% "Oracle"){
-    tryCatch({
-      drv <- DBI::dbDriver("Oracle")
-      con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-    }, warning = function(w) {
-    }, error = function(e) {
-      return(toJSON("Connection failed"))
-    }, finally = {
-    })
-  }else{
-    dir.create("C:/LOBTAG", showWarnings = F)
-    con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")
-    }
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   table_name <- "LBT_RECAPTURES"
 
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -601,7 +637,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   ## look for existing table
   if(db %in% "Oracle"){
     query <- paste("SELECT COUNT(*) FROM user_tables WHERE table_name = '", table_name, "'", sep = "")
-  }else{query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
+  }else{if(db %in% "local")query <- paste("SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name='", table_name, "'", sep = "")}
 
   result <- dbGetQuery(con, query)
   # If the table does not exist, create it
@@ -639,6 +675,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   recaptures <- read_xlsx(file_path, na = c("","NA"))
   #recaptures <- read.csv(file_path, na.strings = c("","NA"))
   rec <- recaptures
+
   ## Process / standardize the data table
 
   ##testing
@@ -720,7 +757,7 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
   sus_lon = which(rec$LON_DD>0) ## suspect longitudes not in the Western hemisphere
   neg_lat.min = which(!is.na(rec$LAT_MINUTE) & rec$LAT_MINUTE<0)
   neg_lon.min = which(!is.na(rec$LON_MINUTE) & rec$LON_MINUTE<0)
-  bad_date = which(rec$REL_DATE %in% NA)
+  bad_date = which(rec$REC_DATE %in% NA)
 
   ## check if any recapture events seems to be replicates
   rec <- rec %>% mutate(reps = paste(TAG_ID,REC_DATE,LAT_DD,LON_DD))
@@ -914,29 +951,20 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
       table_name <- "LBT_RECAPTURES"
       people.tab.name <- "LBT_PEOPLE"
       # Connect to database
-      if(db %in% "Oracle"){
-        tryCatch({
-          drv <- DBI::dbDriver("Oracle")
-          con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-        }, warning = function(w) {
-        }, error = function(e) {
-          return(toJSON("Connection failed"))
-        }, finally = {
-        })
-      }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+      db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
       ## check for already entered recapture events, then upload all new recaptures
       entered =NULL
       for(i in 1:nrow(rec)){
-        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-        sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+        sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",rec$PERSON[i],"'", sep = "")
+        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
         check <- dbSendQuery(con, sql)
         existing_event <- dbFetch(check)
         entered <- rbind(entered,existing_event)
         dbClearResult(check)
 
         if(nrow(existing_event)==0){
-          sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+          sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','",rec$REWARDED[i],"','",rec$COMMENTS[i],"')", sep = "")
           if(db %in% "local"){dbBegin(con)}
           result <- dbSendQuery(con, sql)
           dbCommit(con)
@@ -1036,48 +1064,103 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
     table_name <- "LBT_RECAPTURES"
     people.tab.name <- "LBT_PEOPLE"
     # Connect to database
-    if(db %in% "Oracle"){
-      tryCatch({
-        drv <- DBI::dbDriver("Oracle")
-        con <- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
-      }, warning = function(w) {
-      }, error = function(e) {
-        return(toJSON("Connection failed"))
-      }, finally = {
-      })
-    }else{con <- dbConnect(RSQLite::SQLite(), "C:/LOBTAG/LOBTAG.db")}
+    db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     ## check for already entered recapture events, then upload all new recaptures
     entered =NULL
     for(i in 1:nrow(rec)){
       #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",rec$PERSON[i],"'", sep = "")
       check <- dbSendQuery(con, sql)
       existing_event <- dbFetch(check)
       entered <- rbind(entered,existing_event)
       dbClearResult(check)
 
       if(nrow(existing_event)==0){
-        sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','","no","','",rec$COMMENTS[i],"')", sep = "")
+        sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",rec$PERSON[i],"','",rec$PERSON_2[i],"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",rec$CAPTAIN[i],"','",rec$VESSEL[i],"','",rec$YEAR[i],"','",rec$MANAGEMENT_AREA[i],"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','",rec$REWARDED[i],"','",rec$COMMENTS[i],"')", sep = "")
         if(db %in% "local"){dbBegin(con)}
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
       }
 
-      ## check and update PEOPLE table if person is new
-      sql <- paste("SELECT * FROM ",people.tab.name, " WHERE NAME = '", rec$PERSON[i],"'",sep = "")
-      check <- dbSendQuery(con, sql)
-      existing_person <- dbFetch(check)
-      dbClearResult(check)
+      ## update PEOPLE table with any new info
+      if(db  %in% "Oracle"){
+        sql <- paste(
+          "MERGE INTO \"", people.tab.name, "\" tgt",
+          " USING (SELECT '", rec$PERSON[i], "' AS \"NAME\", '", rec$CIVIC[i], "' AS \"CIVIC\", '", rec$TOWN[i], "' AS \"TOWN\", '",
+          rec$PROV[i], "' AS \"PROV\", '", rec$COUNTRY[i], "' AS \"COUNTRY\", '", rec$POST[i], "' AS \"POST\", '", rec$EMAIL[i], "' AS \"EMAIL\", '",
+          rec$PHO1[i], "' AS \"PHO1\", '", rec$PHO2[i], "' AS \"PHO2\", '", rec$AFFILIATION[i], "' AS \"AFFILIATION\", '", rec$LICENSE_AREA[i], "' AS \"LICENSE_AREA\" FROM dual) src",
+          " ON (tgt.\"NAME\" = src.\"NAME\")",
+          " WHEN MATCHED THEN UPDATE SET",
+          " tgt.\"CIVIC\" = NVL(tgt.\"CIVIC\", src.\"CIVIC\"),",
+          " tgt.\"TOWN\" = NVL(tgt.\"TOWN\", src.\"TOWN\"),",
+          " tgt.\"PROV\" = NVL(tgt.\"PROV\", src.\"PROV\"),",
+          " tgt.\"COUNTRY\" = NVL(tgt.\"COUNTRY\", src.\"COUNTRY\"),",
+          " tgt.\"POST\" = NVL(tgt.\"POST\", src.\"POST\"),",
+          " tgt.\"EMAIL\" = NVL(tgt.\"EMAIL\", src.\"EMAIL\"),",
+          " tgt.\"PHO1\" = NVL(tgt.\"PHO1\", src.\"PHO1\"),",
+          " tgt.\"PHO2\" = NVL(tgt.\"PHO2\", src.\"PHO2\"),",
+          " tgt.\"AFFILIATION\" = NVL(tgt.\"AFFILIATION\", src.\"AFFILIATION\"),",
+          " tgt.\"LICENSE_AREA\" = NVL(tgt.\"LICENSE_AREA\", src.\"LICENSE_AREA\")",
+          " WHEN NOT MATCHED THEN",
+          " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
+          " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
+          sep = ""
+        )
 
-      if(nrow(existing_person)==0){
-        sql <- paste("INSERT INTO ",people.tab.name, " VALUES ('",rec$PERSON[i],"', '",rec$CIVIC[i],"', '",rec$TOWN[i],"', '",rec$PROV[i],"','",rec$COUNTRY[i],"','",rec$POST[i],"','",rec$EMAIL[i],"','",rec$PHO1[i],"','",rec$PHO2[i],"','",rec$AFFILIATION[i],"','",rec$LICENSE_AREA[i],"')", sep = "")
         if(db %in% "local"){dbBegin(con)}
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
       }
+
+      if(db %in% "local"){
+        dbBegin(con)
+
+        for(i in seq_len(nrow(rec))){
+          # Construct the UPDATE query
+          update_query <- paste(
+            "UPDATE ", people.tab.name,
+            " SET CIVIC = COALESCE(CIVIC, '", rec$CIVIC[i], "'),",
+            " TOWN = COALESCE(TOWN, '", rec$TOWN[i], "'),",
+            " PROV = COALESCE(PROV, '", rec$PROV[i], "'),",
+            " COUNTRY = COALESCE(COUNTRY, '", rec$COUNTRY[i], "'),",
+            " POST = COALESCE(POST, '", rec$POST[i], "'),",
+            " EMAIL = COALESCE(EMAIL, '", rec$EMAIL[i], "'),",
+            " PHO1 = COALESCE(PHO1, '", rec$PHO1[i], "'),",
+            " PHO2 = COALESCE(PHO2, '", rec$PHO2[i], "'),",
+            " AFFILIATION = COALESCE(AFFILIATION, '", rec$AFFILIATION[i], "'),",
+            " LICENSE_AREA = COALESCE(LICENSE_AREA, '", rec$LICENSE_AREA[i], "')",
+            " WHERE NAME = '", rec$PERSON[i], "'", sep = "")
+
+          # Execute the update query
+          dbExecute(con, update_query)
+
+          # Check if the row was updated
+          affected_rows <- dbGetQuery(con, "SELECT changes() AS affected_rows")
+
+          # If no rows were affected by the update, insert the new row
+          if(affected_rows$affected_rows == 0){
+            insert_query <- paste(
+              "INSERT INTO ", people.tab.name,
+              " (NAME, CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA)",
+              " VALUES ('", rec$PERSON[i], "', '", rec$CIVIC[i], "', '", rec$TOWN[i], "', '", rec$PROV[i], "', '", rec$COUNTRY[i], "', '",
+              rec$POST[i], "', '", rec$EMAIL[i], "', '", rec$PHO1[i], "', '", rec$PHO2[i], "', '", rec$AFFILIATION[i], "', '",
+              rec$LICENSE_AREA[i], "')", sep = "")
+            dbExecute(con, insert_query)
+          }
+        }
+
+        dbCommit(con)
+      }
+
+
+
+
+
+
 
     }
 
@@ -1140,12 +1223,58 @@ batch_upload_recaptures <- function(db = "local",oracle.user = oracle.personal.u
 
 
   }
+
+
+  ## run excel backups if the function completes successfully
+  ## set backups location
+  if(backups){
+    if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
+      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+    }else{
+      dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
+      backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
+    }
+
+  # Connect to database
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
+
+  ##update excel backups
+    ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
+    rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+    rec.tab <- fetch(rec.tab)
+    peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+    peep.tab <- fetch(peep.tab)
+    # reformat recaptures back to loading style so they can easily be reuploaded to database:
+    rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
+    rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
+    peep.tab <- peep.tab %>% rename(PERSON = NAME)
+    rec.tab <- left_join(rec.tab,peep.tab)
+    rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
+
+    if(is.null(oracle.user))oracle.user <- ""
+    openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+
+    openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+
+  dbDisconnect(con)
+
+  print(paste0("Data backups stored in ",backup.dir))
+
+  }
+
+
   # library(dplyr)
   # library(ROracle)
   # library(shiny)
   # library(shinyjs)
   # library(svDialogs)
   # library(DT)
+
+
+
+
+
+
 
 }
 

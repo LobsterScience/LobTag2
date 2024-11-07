@@ -1,0 +1,69 @@
+---
+output:
+  pdf_document:
+    fig_height: 6
+    keep_tex: no
+    latex_engine: xelatex
+params:
+  i: i
+  perlist: perlist
+sansfont: Calibri
+header-includes: \usepackage{float} \usepackage{tabto} \usepackage{geometry} \usepackage{mathptmx}
+  \usepackage{anyfontsize} \usepackage{t1enc}
+geometry: margin=.5cm
+---
+
+```{r label, echo=FALSE, error=FALSE, fig.height=6, fig.width=6, message=FALSE, warning=FALSE, results='asis'}
+#perlist = LobTag::generate.reward.data()
+i <- params$i
+perlist = params$perlist
+
+cat(' \\fontsize{14}{14} \\selectfont ')
+cat(" \\par  ")
+    
+add = perlist[[i]]$data
+add = add[which(add$NAME == perlist[[i]]$name)[1],]
+
+cat(' \\fontsize{14}{14} \\setlength{\\leftskip}{8cm} \\selectfont  ')
+cat(' \\fontsize{14}{14} \\selectfont')
+cat('\\thispagestyle{empty}')
+cat("\\newgeometry{left=3cm,right=3cm,top=3cm,bottom=3cm}")
+cat(' \\bigskip')
+cat('\\setlength{\\leftskip}{8cm}')
+cat(perlist[[i]]$paraA)
+cat('\\par \\setlength{\\leftskip}{0pt} \\bigskip ')
+cat(perlist[[i]]$paraB)
+cat(perlist[[i]]$mytagcapturedbutihavenoreturns)
+cat(perlist[[i]]$info)
+cat(perlist[[i]]$capbefore)
+cat(perlist[[i]]$capafter)
+cat(perlist[[i]]$capturedbeforeandafter)
+cat(perlist[[i]]$consider)
+cat(perlist[[i]]$pickup)
+cat(perlist[[i]]$released)
+cat(perlist[[i]]$notreleased)
+cat(perlist[[i]]$unknownrel)
+cat(perlist[[i]]$mixedrelret)
+cat(perlist[[i]]$final)
+cat(perlist[[i]]$end)
+cat("\\par \\restoregeometry")
+
+charts = perlist[[i]]$charts
+pagecount = 1
+for(j in 1:length(charts)){
+  cat(' \\newpage ') 
+  impath = charts[j]
+  cat("<center>")
+  cat("![](",impath,")")
+  cat(perlist[[i]]$mapdisclaimer)
+  cat("</center>")
+  cat(" \\ ") 
+  pagecount = j
+}
+
+cat("![](C:\\LOBTAG\\extdata\\rewards\\TagSheet1.pdf)")
+cat(' \\newpage ')
+cat("![](C:\\LOBTAG\\extdata\\rewards\\TagSheet2.pdf)")
+
+```
+
