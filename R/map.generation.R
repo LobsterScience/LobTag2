@@ -10,6 +10,8 @@ generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NUL
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
 
+  if(is.null(db)){return(base::message("You need to specify a database with db = "))}
+
   if(db %in% c("local","Local","LOCAL")){
     db = "local"
   }
