@@ -116,9 +116,6 @@ delete_recaptures <- function(db = NULL,
   # Server
   server <- function(input, output, session) {
 
-    ### open db connection
-  db_connection(db, oracle.user, oracle.password, oracle.dbname)
-
     # Function to update message text with HTML for color
     update_message <- function(message, color = "black") {
       output$delete_message <- renderUI({
@@ -127,6 +124,10 @@ delete_recaptures <- function(db = NULL,
     }
 
     observeEvent(input$search_button, {
+
+      ### open db connection
+      db_connection(db, oracle.user, oracle.password, oracle.dbname)
+
       tag_prefix <- input$tag_prefix
       tag_number <- input$tag_number
       date_caught <- format(input$date_caught, "%Y-%m-%d")
@@ -167,7 +168,9 @@ delete_recaptures <- function(db = NULL,
         print(paste0("Regenerating paths for ",tag_prefix,tag_number," ... please wait"))
         # Introduce a delay before executing the function
         delay(10,
-              LobTag2::generate_paths(tags = paste0(tag_prefix, tag_number)))
+              LobTag2::generate_paths(db = db, tags = paste0(tag_prefix, tag_number)))
+        ### reopen db connection
+        db_connection(db, oracle.user, oracle.password, oracle.dbname)
       }
       delay(100,
             if (delete_success) {

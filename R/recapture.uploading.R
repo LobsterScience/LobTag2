@@ -451,7 +451,7 @@ upload_recaptures <- function(db = NULL, backups = T,
                          , sep = "")
           # Execute SQL update/insert statement for the LBT_PEOPLE table
           dbExecute(con, sql_2)
-          #dbCommit(con)
+          dbCommit(con)
 
         }else{if(db %in% "local"){
           # Check if the person already exists in the LBT_PEOPLE table
@@ -490,14 +490,13 @@ upload_recaptures <- function(db = NULL, backups = T,
 
             dbExecute(con, insert_query)
           }
-
         }
           }
 
       }
 
       ## commit additions to dbase
-      dbCommit(con)
+      #dbCommit(con)
 
       # Update status
       output$status <- renderText({
