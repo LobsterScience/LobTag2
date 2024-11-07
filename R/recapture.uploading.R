@@ -8,7 +8,9 @@ upload_recaptures <- function(db = NULL, backups = T,
                               oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                               oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
 
-  if(db %in% c("local","Local","LOCAL")){
+  if(is.null(db)){return(base::message("You need to specify a database with db = "))}
+
+   if(db %in% c("local","Local","LOCAL")){
     db = "local"
   }
 
@@ -579,7 +581,9 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
                                     oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
                                     oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL){
 
-  if(db %in% c("local","Local","LOCAL")){
+  if(is.null(db)){return(base::message("You need to specify a database with db = "))}
+
+   if(db %in% c("local","Local","LOCAL")){
     db = "local"
   }
 
