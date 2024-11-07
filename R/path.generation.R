@@ -1,10 +1,10 @@
 #' @title generate_paths
-#' @import dplyr RSQLite raster gdistance PBSmapping terra sf
+#' @import dplyr RSQLite raster gdistance PBSmapping terra sf openxlsx
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
 generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
-                           neighborhood = 8, type = "least.cost", regen.paths = FALSE,
+                           neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE,
                            oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                            oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                            oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -451,6 +451,25 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     dbDisconnect(con)
   }else{
     print("No new paths created.")  }
+
+  ## include option to save a single spreadhseet of the data
+  if(save.table){
+    db_connection(db, oracle.user, oracle.password, oracle.dbname)
+    query = paste0("SELECT * FROM LBT_PATH")
+    path <- dbSendQuery(con, query)
+    path <- fetch(path)
+    query = paste0("SELECT * FROM LBT_PATHS")
+    paths <- dbSendQuery(con, query)
+    paths <- fetch(paths)
+    dists <- path %>% dplyr::select(TID,CID,DIST)
+    path.dat <- left_join(paths,dists)
+    path.dat <- path.dat %>% mutate(DIST = ifelse(REC_DATE %in% NA,NA,DIST))
+    dlg_message("Choose the directory where you want to save your path data table.")
+    save.location <- dlg_dir(filter = dlg_filters["xls",])$res
+    if(is.null(oracle.user))oracle.user <- ""
+    openxlsx::write.xlsx(path.dat, file = paste0(save.location,"/",oracle.user,"_PATHS.xlsx"), rowNames = F)
+    dbDisconnect(con)
+  }
 
 
 ## troubleshooting code
