@@ -14,7 +14,7 @@ system.file("data", "user_guide.pptx", package = "LobTag2")
 
 Read the user guide for more info.
 
-Likewise, the location of your template csv files for data entry is found with:
+Likewise, the location of your template excel files for data entry is found with:
 
 system.file("extdata", package = "LobTag2")
 
@@ -23,12 +23,17 @@ You will need an account with Mapbox to use the mapping functionality. Setting u
 https://account.mapbox.com/auth/signup/
 and create an account. Once you have an account you’ll get a free a public token. Use map_token = “your token” when running the generate_maps() function. 
 
-Other Included data files (for mapping) found in 
+Other included data files found in system.file("data", package = "LobTag2"): 
 
-system.file("data", package = "LobTag2"):
 
-NS_extent   ## default basemap to use for reference inset map when making maps. You can choose to draw your own when running generate_maps().
-depthraster2.tif   ## depth raster used for drawing probable paths
+gebco_2024.tif ## depth raster that functions use to identify land
+
+
+knit_rewards.Rmd ## RMarkdown file used to knit lobster letters
+
+
+new_land_coords.rds ## polygons that define a additional land segments to the initial depth raster for mapping. User can add more land to this file with the draw_land() function.
+
 
 
 Other possible dependency issues:
