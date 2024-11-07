@@ -23,9 +23,7 @@ You will need an account with Mapbox to use the mapping functionality. Setting u
 https://account.mapbox.com/auth/signup/
 and create an account. Once you have an account you’ll get a free a public token. Use map_token = “your token” when running the generate_maps() function. 
 
-Other included data files found in
-
-system.file("data", package = "LobTag2"): 
+Other included data files found in system.file("data", package = "LobTag2"): 
 
 
 gebco_2024.tif ## depth raster that functions use to identify land
