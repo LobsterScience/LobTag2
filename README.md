@@ -32,7 +32,7 @@ gebco_2024.tif ## depth raster that functions use to identify land
 knit_rewards.Rmd ## RMarkdown file used to knit lobster letters
 
 
-new_land_coords.rds ## polygons that define a additional land segments to the initial depth raster for mapping. User can add more land to this file with the draw_land() function.
+new_land_coords.rds ## polygons that define additional land segments to the initial depth raster for mapping. User can add more land to this file with the draw_land() function.
 
 
 
