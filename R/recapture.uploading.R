@@ -9,6 +9,7 @@ upload_recaptures <- function(db = NULL, backups = T,
                               oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
+  if(is.null(oracle.user))oracle.user <- ""
 
    if(db %in% c("local","Local","LOCAL")){
     db = "local"
@@ -529,7 +530,6 @@ upload_recaptures <- function(db = NULL, backups = T,
               rec.tab <- left_join(rec.tab,peep.tab)
               rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
 
-              if(is.null(oracle.user))oracle.user <- ""
               openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
 
               openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
@@ -571,6 +571,14 @@ upload_recaptures <- function(db = NULL, backups = T,
 }
 
 
+
+
+
+
+
+
+
+
 #' @title batch_upload_recaptures
 #' @import dplyr ROracle DBI shiny DT svDialogs readxl openxlsx
 #' @description batch uploads tag recaptures data
@@ -581,6 +589,7 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
                                     oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
+  if(is.null(oracle.user))oracle.user <- ""
 
    if(db %in% c("local","Local","LOCAL")){
     db = "local"
@@ -673,11 +682,20 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 ################################################################################################# MAIN FUNCTION:
 
   ## Allow user to choose data file to upload
-  dlg_message("In the following window, choose a csv file containing your recaptures data")
+  dlg_message("In the following window, choose an xlsx file containing your recaptures data")
   file_path <- dlg_open(filter = dlg_filters["xls",])$res
   recaptures <- read_xlsx(file_path, na = c("","NA"))
   #recaptures <- read.csv(file_path, na.strings = c("","NA"))
   rec <- recaptures
+
+  ## set backups location
+  if(backups){
+    if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
+      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+    }else{
+      dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
+      backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
+    }}
 
   ## Process / standardize the data table
 
@@ -1054,9 +1072,34 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
           ) })
       }
 
-    }) ## observ event
+      ## run excel backups
+      ###########################################
+        if(backups){
+        # Connect to database
+        db_connection(db, oracle.user, oracle.password, oracle.dbname)
+        ##update excel backups
+        ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
+        rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+        rec.tab <- fetch(rec.tab)
+        peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+        peep.tab <- fetch(peep.tab)
+        # reformat recaptures back to loading style so they can easily be reuploaded to database:
+        rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
+        rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
+        peep.tab <- peep.tab %>% rename(PERSON = NAME)
+        rec.tab <- left_join(rec.tab,peep.tab)
+        rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        dbDisconnect(con)
+        print(paste0("Data backups stored in ",backup.dir))
+      }
+      ##################################################
+
+    }) ## observ event (upload table)
 
     } ## serv logic
+
     # Run the application
     return(shinyApp(ui = ui, server = server))
   }
@@ -1216,54 +1259,67 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         )
       }
 
+
+      ## run excel backups
+      ###########################################
+      if(backups){
+        # Connect to database
+        db_connection(db, oracle.user, oracle.password, oracle.dbname)
+        ##update excel backups
+        ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
+        rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+        rec.tab <- fetch(rec.tab)
+        peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+        peep.tab <- fetch(peep.tab)
+        # reformat recaptures back to loading style so they can easily be reuploaded to database:
+        rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
+        rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
+        peep.tab <- peep.tab %>% rename(PERSON = NAME)
+        rec.tab <- left_join(rec.tab,peep.tab)
+        rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        dbDisconnect(con)
+        print(paste0("Data backups stored in ",backup.dir))
+      }
+      ##################################################
+
       # Run the application
       shinyApp(ui = ui, server = server)
 
     }else{
       dlg_message("All recaptures uploaded successfully without errors!")
+
+      ## run excel backups
+      ###########################################
+        if(backups){
+        # Connect to database
+        db_connection(db, oracle.user, oracle.password, oracle.dbname)
+        ##update excel backups
+        ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
+        rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
+        rec.tab <- fetch(rec.tab)
+        peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
+        peep.tab <- fetch(peep.tab)
+        # reformat recaptures back to loading style so they can easily be reuploaded to database:
+        rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
+        rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
+        peep.tab <- peep.tab %>% rename(PERSON = NAME)
+        rec.tab <- left_join(rec.tab,peep.tab)
+        rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        dbDisconnect(con)
+        print(paste0("Data backups stored in ",backup.dir))
+      }
+      ####################################################
+
     }
 
 
 
   }
 
-
-  ## run excel backups if the function completes successfully
-  ## set backups location
-  if(backups){
-    if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
-      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
-    }else{
-      dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
-      backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
-    }
-
-  # Connect to database
-  db_connection(db, oracle.user, oracle.password, oracle.dbname)
-
-  ##update excel backups
-    ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE in spreadsheets
-    rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
-    rec.tab <- fetch(rec.tab)
-    peep.tab <- dbSendQuery(con, "select * from LBT_PEOPLE")
-    peep.tab <- fetch(peep.tab)
-    # reformat recaptures back to loading style so they can easily be reuploaded to database:
-    rec.tab <- rec.tab %>% mutate(DAY=day(as.Date(REC_DATE)), MONTH = month(as.Date(REC_DATE)))
-    rec.tab <- rec.tab %>% dplyr::select(-TAG_ID,-REC_DATE)
-    peep.tab <- peep.tab %>% rename(PERSON = NAME)
-    rec.tab <- left_join(rec.tab,peep.tab)
-    rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
-
-    if(is.null(oracle.user))oracle.user <- ""
-    openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
-
-    openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
-
-  dbDisconnect(con)
-
-  print(paste0("Data backups stored in ",backup.dir))
-
-  }
 
 
   # library(dplyr)
@@ -1272,10 +1328,6 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
   # library(shinyjs)
   # library(svDialogs)
   # library(DT)
-
-
-
-
 
 
 
