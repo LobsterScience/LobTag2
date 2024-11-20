@@ -11,6 +11,8 @@ generate_paths(
   neighborhood = 8,
   type = "least.cost",
   regen.paths = FALSE,
+  save.table = FALSE,
+  add.land = T,
   oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
   oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
     NULL,

@@ -119,7 +119,7 @@ upload_recaptures <- function(db = NULL, backups = T,
   ## set backups location
     if(backups){
       if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
-        backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+        backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit Shared/Projects and Programs/Tagging/Master_data"
       }else{
         dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
         backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res
@@ -691,7 +691,7 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
   ## set backups location
   if(backups){
     if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG","ZISSERSONB","zissersonb")){
-      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit/Projects and Programs/Tagging/Master_data"
+      backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit Shared/Projects and Programs/Tagging/Master_data"
     }else{
       dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
       backup.dir <- dlg_dir(filter = dlg_filters["xls",])$res

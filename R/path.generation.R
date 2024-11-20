@@ -4,7 +4,7 @@
 #' @export
 
 generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
-                           neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE,
+                           neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE, add.land = T,
                            oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                            oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                            oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -219,6 +219,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       ymin = ymin-0.7
       xmax=xmax+0.7
       xmin=xmin-0.7
+      # ymax = ymax+0.08
+      # ymin = ymin-0.08
+      # xmax=xmax+0.08
+      # xmin=xmin-0.08
       ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
@@ -255,6 +259,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ##################################
 
     ##################################
+    if(add.land){
     #### Import any additional saved land polygons drawn by user and add these as land:
     if(file.exists("C:/LOBTAG/data/new_land_coords.rds")){
     coords_table <- readRDS(file = "C:/LOBTAG/data/new_land_coords.rds")
@@ -265,10 +270,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     })
     polygon_sf <- st_sfc(polygon_list, crs = st_crs(cost_surface))
     new_land_polygons <- vect(polygon_sf)
-
     # Mask the cost surface raster within the polygon areas
     cost_surface <- mask(cost_surface, new_land_polygons,inverse=T, updatevalue = Inf)
     }
+      }
 
     # Convert SpatRaster to RasterLayer
     r <- as(cost_surface, "Raster")
