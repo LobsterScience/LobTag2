@@ -11,6 +11,8 @@ map_by_factor(
   filter.maps.for = NULL,
   group.by = NULL,
   all.releases = F,
+  show.releases = T,
+  show.recaptures = T,
   tag.prefix = NULL,
   add.paths = F,
   map.token = mapbox.token,

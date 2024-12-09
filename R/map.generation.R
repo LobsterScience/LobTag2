@@ -5,7 +5,7 @@
 #' @export
 
 generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
-                          max.pixels = 800000, map.res = 0.9, inset.option = T,
+                          max.pixels = 800000, map.res = 0.9, inset.option = T, anonymous = F,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -322,12 +322,18 @@ for (p in people){
 
     ## main map
       base <- normalize_raster_brick(base)
+
+      ## if anonymous
+      map.person <- person
+      if(anonymous){
+        map.person = ""
+      }
       ## For arrow head sizing:
       if(scale< 0.03){arrow.size = scale*10}else{arrow.size =0.3}
 
       a <- gg_raster(base, maxpixels=max.pixels)+
         ggspatial::annotation_scale(data = path_sf, bar_cols = c("grey", "white"), text_col = "white")+
-        ggtitle(paste(person,"-",i))+
+        ggtitle(paste(map.person,"-",i))+
         geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(arrow.size, "inches")))+
         geom_sf(data=labs.sf, colour = "yellow")+
         geom_sf_label_repel(data = labs.sf, aes(label=name),colour="blue",show.legend=F,nudge_y=0, alpha=0.8,max.overlaps = 20, size=4)+
@@ -359,7 +365,7 @@ for (p in people){
         annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
         #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
       # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
-      ggsave(filename = paste0(person,i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
+      ggsave(filename = paste0(map.person,i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
 
 
   }
@@ -382,8 +388,8 @@ for (p in people){
 #' @export
 
 map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
-                          tag.prefix = NULL, add.paths = F, map.token = mapbox.token, output.location = NULL,
-                          set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
+                          show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
+                          output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -439,8 +445,8 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(!is.null(map.by)){
     map_fact <- sub(paste0(".*", ":"), "", map.by)
-    releases <- releases %>% rename("map_fact" = all_of(map_fact))
-    recaptures <- recaptures %>% rename("map_fact" = all_of(map_fact))
+    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("map_fact" = all_of(map_fact))}
+    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("map_fact" = all_of(map_fact))}
     select.factors <- c(select.factors,"map_fact")
 
   }else{
@@ -456,15 +462,23 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(tab %in% c("releases","RELEASES")){
     rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
+
+    ## include optional filter for specific value of mapping factor
+    if(!is.null(filter.maps.for)){rel.dat <- rel.dat %>% filter(map_fact %in% filter.maps.for)}
+
     rel <- releases %>% dplyr::select(all_of(select.factors))
-    rec <- left_join(recaptures,rel)
+    rec <- left_join(recaptures,(rel %>% dplyr::select(TAG_ID,map_fact)))
     rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
     loop.factor = rel.dat$map_fact
     }
   if(tab %in% c("recaptures","RECAPTURES")){
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
+
+    ## include optional filter for specific value of mapping factor
+    if(!is.null(filter.maps.for)){rec.dat <- rec.dat %>% filter(map_fact %in% filter.maps.for)}
+
     rec <- recaptures %>% dplyr::select(all_of(select.factors))
-    rel<- left_join(releases,rec)
+    rel<- left_join(releases,(rec %>% dplyr::select(TAG_ID,map_fact)))
     rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
     loop.factor = rec.dat$map_fact
   }
@@ -487,10 +501,6 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   ##
   dbDisconnect(con)
 
-  ## include optional filter for specific value of mapping factor
-  if(!is.null(filter.maps.for)){
-    rec.dat <- rec.dat %>% filter(map_fact %in% filter.maps.for)
-  }
 
   for(i in unique(loop.factor)){
 
@@ -536,25 +546,25 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ylen = maxy - miny
 
     while(xlen < ylen){
-      maxx = maxx+.01
-      minx = minx-.01
+      maxx = maxx+.0001
+      minx = minx-.0001
       xlen =  maxx - minx
     }
     while(ylen < xlen){
-      maxy = maxy+.01
-      miny = miny-.01
+      maxy = maxy+.0001
+      miny = miny-.0001
       ylen =  maxy - miny
     }
 
     while(xlen < ylen){
-      maxx = maxx+.001
-      minx = minx-.001
+      maxx = maxx+.0001
+      minx = minx-.0001
       xlen =  maxx - minx
     }
 
     while(ylen < xlen){
-      maxy = maxy+.001
-      miny = miny-.001
+      maxy = maxy+.0001
+      miny = miny-.0001
       ylen =  maxy - miny
     }
 
@@ -564,7 +574,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     maxx = maxx + ylen/3
 
     ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/6
+    scale = (maxy-miny)/8
     maxx = maxx+scale
     minx = minx-scale
     maxy = maxy+scale
@@ -636,6 +646,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     bottom <- as.numeric(limits$ymin)
 
     ## graphing
+
+    ## LFA lines
+    LFA.line <- read_sf("C:/bio.data/bio.lobster/data/maps/LFA polylines")
+
     ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
 
     ## function to normalize the colour values of a reprojected raster brick object for graphing with with gg_raster or other raster graphing functions
@@ -675,29 +689,96 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     base <- normalize_raster_brick(base)
 
     a <- gg_raster(base, maxpixels=max.pixels)+
+      geom_sf(data=LFA.line, colour = "red")+
       ggspatial::annotation_scale(data = sf_rel, bar_cols = c("grey", "white"), text_col = "white")+
       ggtitle(paste(map.by,"-",i))
     if(add.paths){
       p <- geom_sf(data = path_sf, colour = "yellow")
       a <- a+p
     }
-if(is.na(group.by)){
-  a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
-    geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
-    coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-    theme(plot.margin = margin(t = 73))
-}else{
+if(is.null(group.by)){
   if(tab %in% c("releases","RELEASES")){
-    a <- a+
+    if(show.recaptures){
+      a <- a+geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+        geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))
+    }else{
+      a <- a+geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))
+    }
+  }
+
+  if(tab %in% c("recaptures","RECAPTURES")){
+    if(show.releases){
+      a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+        geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))
+    }else{
+      a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))
+    }
+  }
+
+}else{
+  sf_rec <- sf_rec %>% mutate(Event = "Recaptures")
+  sf_rel <- sf_rel %>% mutate(Event = "Releases")
+
+  if(tab %in% c("releases","RELEASES")){
+    if(show.recaptures){
+
+      if(group.by %in% colnames(sf_rec)){
+        a <- a+
+          geom_sf(data=sf_rec, size=1.5, aes(colour = .data[[group.by]], shape =Event))+
+          geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]], shape =Event))+
+          coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+          theme(plot.margin = margin(t = 73))
+      }else{
+        a <- a+
+          geom_sf(data=sf_rec, size=1.5, aes(colour = "Recaptures"))+
+          geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]]))+
+          coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+          theme(plot.margin = margin(t = 73))
+      }
+
+
+    }else{
+      a <- a+
       geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]]))+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-      theme(plot.margin = margin(t = 73))
+      theme(plot.margin = margin(t = 73))+
+      ggtitle("Releases")
+    }
   }
+
   if(tab %in% c("recaptures","RECAPTURES")){
-    a <- a+
-      geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
-      coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-      theme(plot.margin = margin(t = 73))
+    if(show.releases){
+
+      if(group.by %in% colnames(sf_rel)){
+        a <- a+
+          geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]], shape = Event))+
+          geom_sf(data=sf_rel, size=1.5, aes(colour = .data[[group.by]], shape = Event))+
+          coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+          theme(plot.margin = margin(t = 73))
+      }else{
+        a <- a+
+          geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
+          geom_sf(data=sf_rel, size=1.5, aes(colour = "Releases"))+
+          coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+          theme(plot.margin = margin(t = 73))
+      }
+
+    }else{
+      a <- a+
+        geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
+        coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+        theme(plot.margin = margin(t = 73))+
+        ggtitle("Recaptures")
+    }
+
   }
 }
 
