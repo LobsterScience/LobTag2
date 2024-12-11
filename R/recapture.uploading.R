@@ -127,6 +127,16 @@ upload_recaptures <- function(db = NULL, backups = T,
 
     }
 
+    ## define function for handling any special characters such as apostrophes in names
+    escape_special_chars <- function(x) {
+      if (is.character(x)) {
+        # Escape single quotes (') and dashes (-) for Oracle
+        x <- gsub("'", "''", x)
+        x <- gsub("-", "\\-", x)
+      }
+      return(x)
+    }
+
 
   # Define UI for application
   ui <- fluidPage(
@@ -316,8 +326,10 @@ upload_recaptures <- function(db = NULL, backups = T,
 
     # Real-time data retrieval based on "Person" field input
     observeEvent(input$person, {
+      person <- input$person
+      person <- escape_special_chars(person)
       if (nchar(input$person) > 0) {
-        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM LBT_PEOPLE WHERE NAME = '", input$person, "'", sep = "")
+        query <- paste("SELECT CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA FROM LBT_PEOPLE WHERE NAME = '", person, "'", sep = "")
         result <- dbGetQuery(con, query)
         if (nrow(result) > 0) {
           updateTextInput(session, "street_address", value = result$CIVIC)
@@ -349,12 +361,23 @@ upload_recaptures <- function(db = NULL, backups = T,
     # Update table when Submit button is clicked
     observeEvent(input$submit, {
 
-      # Get input values
+      # Get input values (and handle special characters in names)
       tag_prefix <- input$tag_prefix
       tag_number <- input$tag_number
       date <- format(input$date, "%Y-%m-%d")  # Format date for SQLite
       person <- input$person
-      person_2 <- input$person2
+      person <- escape_special_chars(person)
+      person2 <- input$person2
+      person2 <- escape_special_chars(person2)
+      captain <- input$captain
+      captain <- escape_special_chars(captain)
+      vessel <- input$vessel
+      vessel <- escape_special_chars(vessel)
+      management_area <- input$management_area
+      management_area <- escape_special_chars(management_area)
+      comments <- input$comments
+      comments <- escape_special_chars(comments)
+
 
       # Format latitude degrees and decimal minutes
       lat_deg <- as.character(input$lat_deg)
@@ -415,13 +438,13 @@ upload_recaptures <- function(db = NULL, backups = T,
         shinyjs::reset("comments")
 
       if(db %in% "Oracle"){
-        sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')", sep="")
+        sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", captain, "', '", vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", comments, "')", sep="")
       }else{if(db %in% "local")sql_1 <- paste0(
         "INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) ",
-        "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person_2, "', ",
+        "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person2, "', ",
         lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ",
-        depth_fathoms, ", '", released, "', '", input$captain, "', '", input$vessel, "', strftime('%Y', '", date, "'), '",
-        input$management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", input$comments, "')"
+        depth_fathoms, ", '", released, "', '", captain, "', '", vessel, "', strftime('%Y', '", date, "'), '",
+        management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", comments, "')"
       )}
 
       # Execute SQL insert statement
@@ -429,26 +452,43 @@ upload_recaptures <- function(db = NULL, backups = T,
 
       # Prepare SQL update/insert statement for the LBT_PEOPLE table and insert data
       if (nchar(input$person) > 0){
+        ## handle special characters
+        street_address <- input$street_address
+        street_address <- escape_special_chars(street_address)
+        town <- input$town
+        town <- escape_special_chars(town)
+        province <- input$province
+        province <- escape_special_chars(province)
+        country <- input$country
+        country <- escape_special_chars(country)
+        phone1 <- input$phone1
+        phone1 <- escape_special_chars(phone1)
+        phone2 <- input$phone2
+        phone2 <- escape_special_chars(phone2)
+        affiliation <- input$affiliation
+        affiliation <- escape_special_chars(affiliation)
+        license_area <- input$license_area
+        license_area <- escape_special_chars(license_area)
         ## MERGE querying works differently with SQLite and Oracle
         if(db %in% "Oracle"){
           sql_2 <- paste("
       MERGE INTO LBT_PEOPLE tgt
-      USING (SELECT '", input$person, "' AS name FROM dual) src
+      USING (SELECT '", person, "' AS name FROM dual) src
       ON (tgt.NAME = src.name)
       WHEN MATCHED THEN
-      UPDATE SET tgt.CIVIC = '", input$street_address, "',
-                 tgt.TOWN = '", input$town, "',
-                 tgt.PROV = '", input$province, "',
-                 tgt.COUNTRY = '", input$country, "',
+      UPDATE SET tgt.CIVIC = '", street_address, "',
+                 tgt.TOWN = '", town, "',
+                 tgt.PROV = '", province, "',
+                 tgt.COUNTRY = '", country, "',
                  tgt.POST = '", input$postal_code, "',
                  tgt.EMAIL = '", input$email, "',
-                 tgt.PHO1 = '", input$phone1, "',
-                 tgt.PHO2 = '", input$phone2, "',
-                 tgt.AFFILIATION = '", input$affiliation, "',
-                 tgt.LICENSE_AREA = '", input$license_area, "'
+                 tgt.PHO1 = '", phone1, "',
+                 tgt.PHO2 = '", phone2, "',
+                 tgt.AFFILIATION = '", affiliation, "',
+                 tgt.LICENSE_AREA = '", license_area, "'
       WHEN NOT MATCHED THEN
       INSERT (tgt.NAME, tgt.CIVIC, tgt.TOWN, tgt.PROV, tgt.COUNTRY, tgt.POST, tgt.EMAIL, tgt.PHO1, tgt.PHO2, tgt.AFFILIATION, tgt.LICENSE_AREA)
-      VALUES ('", input$person, "', '", input$street_address, "', '", input$town, "', '", input$province, "', '", input$country, "', '", input$postal_code, "', '", input$email, "', '", input$phone1, "', '", input$phone2, "', '", input$affiliation, "', '", input$license_area, "')"
+      VALUES ('", person, "', '", street_address, "', '", town, "', '", province, "', '", country, "', '", input$postal_code, "', '", input$email, "', '", phone1, "', '", phone2, "', '", affiliation, "', '", license_area, "')"
                          , sep = "")
           # Execute SQL update/insert statement for the LBT_PEOPLE table
           dbExecute(con, sql_2)
@@ -459,7 +499,7 @@ upload_recaptures <- function(db = NULL, backups = T,
           check_query <- paste("
   SELECT COUNT(*) as count
   FROM LBT_PEOPLE
-  WHERE NAME = '", input$person, "'", sep = "")
+  WHERE NAME = '", person, "'", sep = "")
 
           # Execute the check query
           res <- dbGetQuery(con, check_query)
@@ -468,17 +508,17 @@ upload_recaptures <- function(db = NULL, backups = T,
           if (res$count > 0) {
             update_query <- paste("
     UPDATE LBT_PEOPLE
-    SET CIVIC = '", input$street_address, "',
-        TOWN = '", input$town, "',
-        PROV = '", input$province, "',
-        COUNTRY = '", input$country, "',
+    SET CIVIC = '", street_address, "',
+        TOWN = '", town, "',
+        PROV = '", province, "',
+        COUNTRY = '", country, "',
         POST = '", input$postal_code, "',
         EMAIL = '", input$email, "',
-        PHO1 = '", input$phone1, "',
-        PHO2 = '", input$phone2, "',
-        AFFILIATION = '", input$affiliation, "',
-        LICENSE_AREA = '", input$license_area, "'
-    WHERE NAME = '", input$person, "'", sep = "")
+        PHO1 = '", phone1, "',
+        PHO2 = '", phone2, "',
+        AFFILIATION = '", affiliation, "',
+        LICENSE_AREA = '", license_area, "'
+    WHERE NAME = '", person, "'", sep = "")
 
             dbExecute(con, update_query)
           } else {
@@ -487,7 +527,7 @@ upload_recaptures <- function(db = NULL, backups = T,
     INSERT INTO LBT_PEOPLE
     (NAME, CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA)
     VALUES
-    ('", input$person, "', '", input$street_address, "', '", input$town, "', '", input$province, "', '", input$country, "', '", input$postal_code, "', '", input$email, "', '", input$phone1, "', '", input$phone2, "', '", input$affiliation, "', '", input$license_area, "')", sep = "")
+    ('", person, "', '", street_address, "', '", town, "', '", province, "', '", country, "', '", input$postal_code, "', '", input$email, "', '", phone1, "', '", phone2, "', '", affiliation, "', '", license_area, "')", sep = "")
 
             dbExecute(con, insert_query)
           }
@@ -504,9 +544,9 @@ upload_recaptures <- function(db = NULL, backups = T,
         "The following tag recaptures have been uploaded to the database:"
       })
 
-      # Add submitted data to the table
+      # Add submitted data to the table (using input$ values avoids showing special character corrections)
       current_data <- submitted_data()
-      new_row <- data.frame(Tag_Prefix = tag_prefix, Tag_Number = tag_number, Date = date, Person = person, Person_2 = person_2, Latitude = paste(lat_deg, "°", lat_dec_min, sep = ""), Longitude = paste(long_deg, "°", long_dec_min, sep = ""))
+      new_row <- data.frame(Tag_Prefix = tag_prefix, Tag_Number = tag_number, Date = date, Person = input$person, Person_2 = input$person2, Latitude = paste(lat_deg, "°", lat_dec_min, sep = ""), Longitude = paste(long_deg, "°", long_dec_min, sep = ""))
       updated_data <- rbind(current_data, new_row)
       submitted_data(updated_data)
 
@@ -543,7 +583,7 @@ upload_recaptures <- function(db = NULL, backups = T,
 
         # Update status
         output$status <- renderText({
-          paste("A recapture of tag",tag_id,"on",date,"by",person,"already exists! Recapture cannot be added.")
+          paste("A recapture of tag",tag_id,"on",date,"by",input$person,"already exists! Recapture cannot be added.")
         })
 
       }
