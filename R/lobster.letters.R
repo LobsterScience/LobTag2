@@ -126,8 +126,20 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   ## for selective letter generation
   if(!is.null(people)){captures <- captures %>% filter(PERSON  %in% people)}
 
+  ### function for handling special characters in names when SQL querying
+  escape_special_chars <- function(x) {
+    if (is.character(x)) {
+      # Escape single quotes (') and dashes (-) for Oracle
+      x <- gsub("'", "''", x)
+      x <- gsub("-", "\\-", x)
+    }
+    return(x)
+  }
+  ##get tags for selected recaptures
   cap.tags <- paste0("('",paste(captures$TAG_ID, collapse ="','"),"')")
-  cap.names <- paste0("('",paste(captures$PERSON, collapse ="','"),"')")
+  cap.names <- paste0("('",paste(escape_special_chars(captures$PERSON), collapse ="','"),"')")
+
+  ##get reamining tables
 
   query = paste("SELECT * FROM",peopdb, "WHERE NAME IN",cap.names)
   peep.quer <- ROracle::dbSendQuery(con,query)
@@ -136,7 +148,6 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   query = paste("SELECT * FROM",reldb, "WHERE TAG_ID IN",cap.tags)
   rel.quer <- ROracle::dbSendQuery(con,query)
   relda <- ROracle::fetch(rel.quer)
-
 
   ROracle::dbDisconnect(con)
 
@@ -332,16 +343,24 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
         generate_maps(people = per$name, only.unrewarded = only.unrewarded, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
 
-        charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
+        ##remove special characters (apostrophes) in map file names, no good way of dealing with these in Latex file sourcing
+        for (file in list.files(path = paste0(output.location,"/maps"), pattern = per$name, full.names = T)){
+          file.rename(
+            file, gsub("'", "", file, fixed = TRUE)
+          )
+        }
+        ## define filenames (with correct apostrophes) then remove apostrophes for per$name from here on for Latex
+        pdf_file_name = paste(letter_path, per$name, ".pdf", sep = "")
+        per$name <- gsub("'", "", per$name, fixed = TRUE)
+
+        charts <- list.files(path = paste0(output.location,"/maps"), pattern = )
         c <- c()
         for(j in 1:length(charts)){
         c <- c(c,paste0(output.location,"/maps/",charts[j]))
         }
         per$charts <- c
-          #perlist[[length(perlist)+1]] = per
-        perlist[[i]] = per
 
-        pdf_file_name = paste(letter_path, per$name, ".pdf", sep = "")
+        perlist[[i]] = per
 
           #render function needs TinyTex installed to run properly. Check if installed and install if not
           if(tinytex::is_tinytex() %in% FALSE){tinytex::install_tinytex(force = TRUE)}

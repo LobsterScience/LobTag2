@@ -115,8 +115,32 @@ while(recheck){
   releases <- dbSendQuery(con, query)
   releases <- fetch(releases)
 
+  ## Handle any special characters in names for SQL querying
+  ### function for handling special characters
+  escape_special_chars <- function(x) {
+    if (is.character(x)) {
+      # Escape single quotes (') and dashes (-) for Oracle
+      x <- gsub("'", "''", x)
+      x <- gsub("-", "\\-", x)
+    }
+    return(x)
+  }
+
+  rec.cols.to.handle <- c("PERSON","PERSON_2","VESSEL","CAPTAIN","MANAGEMENT_AREA","COMMENTS")
+for(i in 1:nrow(recaptures)){
+  for(j in rec.cols.to.handle){
+    recaptures[i,j] <- escape_special_chars(recaptures[i,j])
+  }
+}
+  rel.cols.to.handle <- c("SAMPLER","SAMPLER_2","AFFILIATION","VESSEL","CAPTAIN","PORT","MANAGEMENT_AREA","COMMENTS")
+  for(i in 1:nrow(releases)){
+    for(j in rel.cols.to.handle){
+      releases[i,j] <- escape_special_chars(releases[i,j])
+    }
+  }
+
   ## deal with recaptures that have no person name
-  recaptures <- recaptures %>% mutate(PERSON = ifelse(PERSON %in% "",NA,PERSON))
+  recaptures <- recaptures %>% mutate(PERSON = ifelse(PERSON %in% c("","NA"),NA,PERSON))
   for(i in 1:nrow(recaptures)){
     if(is.na(recaptures$PERSON[i])){
       recaptures$PERSON[i] = paste0("Fisher ",i)

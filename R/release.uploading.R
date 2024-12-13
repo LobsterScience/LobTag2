@@ -90,6 +90,15 @@ upload_releases <- function(db = NULL,
 
 ####################################################################################################
 ###################################################################### MAIN FUNCTION:
+### function for handling special characters
+  escape_special_chars <- function(x) {
+    if (is.character(x)) {
+      # Escape single quotes (') and dashes (-) for Oracle
+      x <- gsub("'", "''", x)
+      x <- gsub("-", "\\-", x)
+    }
+    return(x)
+  }
 
 ## Allow user to choose data file to upload
 dlg_message("In the following window, choose an xlsx file containing your releases data")
@@ -354,21 +363,14 @@ if(!return_error & return_warning){
           dbClearResult(check)
 
           if(nrow(existing_tag)==0){
-            ## Need to handle any special characters such as apostrophes in names
-            escape_special_chars <- function(x) {
-              if (is.character(x)) {
-                # Escape single quotes (') and dashes (-) for Oracle
-                x <- gsub("'", "''", x)
-                x <- gsub("-", "\\-", x)
-              }
-              return(x)
-            }
+
             rel$SAMPLER[i] = escape_special_chars(rel$SAMPLER[i])
             rel$SAMPLER_2[i] = escape_special_chars(rel$SAMPLER_2[i])
             rel$AFFILIATION[i] = escape_special_chars(rel$AFFILIATION[i])
             rel$VESSEL[i] = escape_special_chars(rel$VESSEL[i])
             rel$CAPTAIN[i] = escape_special_chars(rel$CAPTAIN[i])
             rel$PORT[i] = escape_special_chars(rel$PORT[i])
+            rel$MANAGEMENT_AREA[i] = escape_special_chars(rel$MANAGEMENT_AREA[i])
             rel$COMMENTS[i] = escape_special_chars(rel$COMMENTS[i])
             sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
             if(db %in% "local"){dbBegin(con)}
@@ -462,22 +464,17 @@ if(!return_error & return_warning){
   dbClearResult(check)
 
   if(nrow(existing_tag)==0){
-    ## Need to handle any special characters such as apostrophes in names
-    escape_special_chars <- function(x) {
-      if (is.character(x)) {
-        # Escape single quotes (') and dashes (-) for Oracle
-        x <- gsub("'", "''", x)
-        x <- gsub("-", "\\-", x)
-      }
-      return(x)
-    }
+
+    ## handle any special characters such as apostrophes in names
     rel$SAMPLER[i] = escape_special_chars(rel$SAMPLER[i])
     rel$SAMPLER_2[i] = escape_special_chars(rel$SAMPLER_2[i])
     rel$AFFILIATION[i] = escape_special_chars(rel$AFFILIATION[i])
     rel$VESSEL[i] = escape_special_chars(rel$VESSEL[i])
     rel$CAPTAIN[i] = escape_special_chars(rel$CAPTAIN[i])
     rel$PORT[i] = escape_special_chars(rel$PORT[i])
+    rel$MANAGEMENT_AREA[i] = escape_special_chars(rel$MANAGEMENT_AREA[i])
     rel$COMMENTS[i] = escape_special_chars(rel$COMMENTS[i])
+
     sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
     if(db %in% "local"){dbBegin(con)}
     result <- dbSendQuery(con, sql)
