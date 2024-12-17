@@ -22,6 +22,9 @@ map_by_factor(
   max.pixels = 8e+05,
   map.res = 0.9,
   inset.map = T,
+  point.size = 1.5,
+  file.type = "pdf",
+  margin = 1,
   oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
   oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
     NULL,

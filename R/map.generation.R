@@ -390,6 +390,7 @@ for (p in people){
 map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
                           output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
+                          point.size = 1.5, file.type = "pdf", margin = 1,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -421,10 +422,6 @@ map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.map
       dlg_message("In the following window, choose the directory where you want to send your maps.")
       output.location <- dlg_dir(filter = dlg_filters["csv",])$res
     }
-  }
-  if(set.inset){
-    ## Allow user to choose whether or not to manually draw inset map
-    result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
   }
 
   ### open db connection
@@ -546,39 +543,43 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ylen = maxy - miny
 
     while(xlen < ylen){
-      maxx = maxx+.0001
-      minx = minx-.0001
+      maxx = maxx+.00001
+      minx = minx-.00001
       xlen =  maxx - minx
     }
-    while(ylen < xlen){
-      maxy = maxy+.0001
-      miny = miny-.0001
+    while(ylen < 0.67*xlen){
+      maxy = maxy+.000001
+      miny = miny-.000001
       ylen =  maxy - miny
     }
 
-    while(xlen < ylen){
-      maxx = maxx+.0001
-      minx = minx-.0001
-      xlen =  maxx - minx
-    }
-
-    while(ylen < xlen){
-      maxy = maxy+.0001
-      miny = miny-.0001
-      ylen =  maxy - miny
-    }
+    # while(xlen < ylen){
+    #   maxx = maxx+.00001
+    #   minx = minx-.00001
+    #   xlen =  maxx - minx
+    # }
+    #
+    # while(ylen < 0.75*xlen){
+    #   maxy = maxy+.00001
+    #   miny = miny-.00001
+    #   ylen =  maxy - miny
+    # }
 
 
     #stretch on x axis for visual squareness
-    minx = minx - ylen/3
-    maxx = maxx + ylen/3
+    # minx = minx - ylen/3
+    # maxx = maxx + ylen/3
 
     ##visually scale plotting area a bit wider
-    scale = (maxy-miny)/8
-    maxx = maxx+scale
-    minx = minx-scale
-    maxy = maxy+scale
-    miny = miny-scale
+    if(margin>0){
+      margin = margin/100
+      scale = (maxy-miny)*margin
+      maxx = maxx+scale
+      minx = minx-scale
+      maxy = maxy+scale
+      miny = miny-scale
+    }
+
 
     ## If just one point, set box size
     if(maxx == minx & maxy == miny){
@@ -606,8 +607,13 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     base <- raster::projectRaster(base,  crs = 4326)
 
     if(inset.map){
+      if(set.inset){
+        ## Allow user to choose whether or not to manually draw inset map
+        result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+      }
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
-    if(result$res %in% "yes"){ext.inset <- draw_ext()}else{
+    if(result$res %in% "yes"){ext.inset_sf <- draw_ext()
+    }else{
 
       expand = 5
       ## if the mapping area is very small, keep increasing expand factor until inset size is meaningful (at least about 2 degrees of longitude)
@@ -615,11 +621,12 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
       ext.inset <- sf::st_polygon(list(matrix(c(minx-(xlen*expand),miny-(ylen*expand),maxx+(xlen*expand),miny-(ylen*expand),maxx+(xlen*expand),maxy+(ylen*expand),minx-(xlen*expand),maxy+(ylen*expand),minx-(xlen*expand),miny-(ylen*expand)),ncol = 2, byrow = T)))
       ext.inset_sf <- sf::st_sfc(ext.inset, crs = 4326)
-      ext.inset_sf <- sf::st_sf(ext.inset_sf)
-      sf::st_crs(ext.inset_sf) <- 4326
     }
 
-    set_defaults(ext.inset, map_service = "mapbox",map_type = "satellite",
+      ext.inset_sf <- sf::st_sf(ext.inset_sf)
+      sf::st_crs(ext.inset_sf) <- 4326
+
+    set_defaults(ext.inset_sf, map_service = "mapbox",map_type = "satellite",
                  map_token = map.token, map_dir = tempdir())
 
     inset <- basemap_raster(ext.inset_sf, map_res = 0.9) #### mapbox's default datum is mercator (3857)
@@ -699,12 +706,12 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 if(is.null(group.by)){
   if(tab %in% c("releases","RELEASES")){
     if(show.recaptures){
-      a <- a+geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+      a <- a+geom_sf(data=sf_rel, size=point.size,aes(colour = "Releases"))+
         geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))
     }else{
-      a <- a+geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
+      a <- a+geom_sf(data=sf_rel, size=point.size, aes(colour = "Releases"))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))
     }
@@ -712,12 +719,12 @@ if(is.null(group.by)){
 
   if(tab %in% c("recaptures","RECAPTURES")){
     if(show.releases){
-      a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+      a <- a+geom_sf(data=sf_rec, size=point.size, aes(color = "Recaptures"))+
         geom_sf(data=sf_rel, size=1.5,aes(colour = "Releases"))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))
     }else{
-      a <- a+geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+      a <- a+geom_sf(data=sf_rec, size=point.size, aes(color = "Recaptures"))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))
     }
@@ -732,14 +739,14 @@ if(is.null(group.by)){
 
       if(group.by %in% colnames(sf_rec)){
         a <- a+
-          geom_sf(data=sf_rec, size=1.5, aes(colour = .data[[group.by]], shape =Event))+
-          geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]], shape =Event))+
+          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[group.by]], shape =Event))+
+          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]], shape =Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
-          geom_sf(data=sf_rec, size=1.5, aes(colour = "Recaptures"))+
-          geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]]))+
+          geom_sf(data=sf_rec, size=point.size, aes(colour = "Recaptures"))+
+          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]]))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }
@@ -747,7 +754,7 @@ if(is.null(group.by)){
 
     }else{
       a <- a+
-      geom_sf(data=sf_rel, size=1.5,aes(colour = .data[[group.by]]))+
+      geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]]))+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
       theme(plot.margin = margin(t = 73))+
       ggtitle("Releases")
@@ -759,13 +766,13 @@ if(is.null(group.by)){
 
       if(group.by %in% colnames(sf_rel)){
         a <- a+
-          geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]], shape = Event))+
+          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]], shape = Event))+
           geom_sf(data=sf_rel, size=1.5, aes(colour = .data[[group.by]], shape = Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
-          geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
+          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]]))+
           geom_sf(data=sf_rel, size=1.5, aes(colour = "Releases"))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
@@ -773,7 +780,7 @@ if(is.null(group.by)){
 
     }else{
       a <- a+
-        geom_sf(data=sf_rec, size=1.5,aes(colour = .data[[group.by]]))+
+        geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]]))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))+
         ggtitle("Recaptures")
@@ -810,7 +817,7 @@ if(inset.map){
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
     name.by =ifelse(!is.null(map.by),map_fact,"")
-    ggsave(filename = paste0(tab," ",name.by," ",i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
+    ggsave(filename = paste0(tab," ",name.by," ",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10)
 
 
   }
@@ -827,10 +834,30 @@ if(inset.map){
   # library(DBI)
   # library(raster)
 
-
-
-
-
+  #db = NULL
+  # factor.from = "RELEASES"
+  # map.by= NULL
+  # filter.maps.for=NULL
+  # group.by=NULL
+  # all.releases = T
+  # show.releases = T
+  # show.recaptures = T
+  # tag.prefix = NULL
+  # add.paths = F
+  # map.token = mapbox.token
+  # output.location = NULL
+  # set.output = T
+  # set.inset=T
+  # max.pixels = 800000
+  # map.res = 0.9
+  # inset.map=F
+  # point.size = 1.5
+  # file.type = "pdf"
+  # extra.zoom = 100
+#
+#   oracle.user = oracle.personal.user
+#   oracle.password = oracle.personal.password
+#   oracle.dbname = oracle.personal.server
 }
 
 
