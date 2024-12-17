@@ -390,7 +390,7 @@ for (p in people){
 map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
                           output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
-                          point.size = 1.5, file.type = "pdf", margin = 1,
+                          point.size = 1.5, file.type = "pdf", dpi= 900, margin = 1,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -817,7 +817,7 @@ if(inset.map){
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
     name.by =ifelse(!is.null(map.by),map_fact,"")
-    ggsave(filename = paste0(tab," ",name.by," ",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10)
+    ggsave(filename = paste0(tab," ",name.by," ",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
 
   }
