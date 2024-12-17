@@ -428,6 +428,16 @@ send.lobster.letters <- function(db = "Oracle",
                                  oracle.password = oracle.personal.password,
                                  oracle.dbname = oracle.personal.server){
 
+   ### function for handling special characters when SQL querying
+  escape_special_chars <- function(x) {
+    if (is.character(x)) {
+      # Escape single quotes (') and dashes (-) for Oracle
+      x <- gsub("'", "''", x)
+      x <- gsub("-", "\\-", x)
+    }
+    return(x)
+  }
+
   ## choose location of letters
   dlg_message("In the following window, choose the directory where your letters are stored.")
   input.location <- dlg_dir(filter = dlg_filters["csv",])$res
@@ -518,6 +528,7 @@ Dartmouth, NS B2Y 4A2"
     pdf_opened <- reactiveVal(FALSE)  # Track whether the PDF has been opened
     user_email <- reactiveVal(NULL)  # Store the email address reactively
     file_name <- reactiveVal(NULL)   # Store the file name reactively
+    file_name.special.char <- reactiveVal(NULL)   # Store the file name reactively (with special characters handled appropriately)
 
     # Reactivity to show messages
     output$pdf_message <- renderText({
@@ -566,9 +577,11 @@ Dartmouth, NS B2Y 4A2"
       # Extract name from PDF file name (assuming it's in the format "Name_Surname.pdf")
       current_file_name <- tools::file_path_sans_ext(basename(pdf_files[pdf_counter()]))  ###reactively stored
       file_name(current_file_name)
+      current_file_name.special <- escape_special_chars(current_file_name)
+      file_name.special.char(current_file_name.special)
 
       # Query the Oracle table to retrieve the email based on the name
-      email_query <- paste0("SELECT EMAIL FROM LBT_PEOPLE WHERE NAME = '", file_name(), "'")
+      email_query <- paste0("SELECT EMAIL FROM LBT_PEOPLE WHERE NAME = '", file_name.special.char(), "'")
       email_result <- dbGetQuery(con, email_query)
 
       # Check if an email was found
@@ -602,8 +615,9 @@ Dartmouth, NS B2Y 4A2"
 
       ## update REWARDED status for now rewarded tags
       map.files <- list.files(paste0(dirname(input.location),"/maps"),full.names = T)
-      sent.tags <- map.files[grep(file_name(), map.files)]
-      sent.tags <- gsub(file_name(),"",basename(sent.tags))
+      mapname <- gsub("'","",file_name())   ## map names never contain apostrophes so don't handle, just remove these to check for tag
+      sent.tags <- map.files[grep(mapname, map.files)]
+      sent.tags <- gsub(mapname,"",basename(sent.tags))
       sent.tags <- gsub(".pdf","",sent.tags)
 
       if(db %in% "Oracle"){
@@ -622,12 +636,13 @@ Dartmouth, NS B2Y 4A2"
     UPDATE LBT_RECAPTURES
     SET REWARDED = '%s'
     WHERE TAG_ID = '%s' AND PERSON = '%s'",
-                                "yes",i,file_name())
+                                "yes",i,file_name.special.char())
 
         # Execute the update query in Oracle
         dbExecute(con, update_query)
       }
       dbCommit(con)
+
 
       # Move the current PDF to the sent folder
       sent_folder <- file.path(input.location, "sent")
@@ -643,6 +658,7 @@ Dartmouth, NS B2Y 4A2"
       output$confirm_message <- renderText({
         paste("Letter:", basename(current_pdf), "has been moved to the 'sent' folder.")
       })
+
     })
 
     observeEvent(input$ready_no, {
