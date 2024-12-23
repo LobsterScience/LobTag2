@@ -3,7 +3,7 @@
 #' @description batch uploads tag release data
 #' @export
 
-upload_releases <- function(db = NULL,
+upload_releases <- function(db = NULL, overwrite.tags = F,
                             oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
                             oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
                             oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL) {
@@ -377,6 +377,42 @@ if(!return_error & return_warning){
             result <- dbSendQuery(con, sql)
             dbCommit(con)
             dbClearResult(result)
+          }else{
+            if(overwrite.tags){
+              update_query <- paste("UPDATE ", table_name,
+    " SET SAMPLER = '", rel$SAMPLER[i], "',
+        SAMPLER_2 = '", rel$SAMPLER_2[i], "',
+        AFFILIATION = '", rel$AFFILIATION[i], "',
+        VESSEL = '", rel$VESSEL[i], "',
+        CAPTAIN = '", rel$CAPTAIN[i], "',
+        PORT = '", rel$PORT[i], "',
+        MANAGEMENT_AREA = '", rel$MANAGEMENT_AREA[i], "',
+        DAY = '", rel$DAY[i], "',
+        MONTH = '", rel$MONTH[i], "',
+        YEAR = '", rel$YEAR[i], "',
+        TAG_COLOR = '", rel$TAG_COLOR[i], "',
+        TAG_PREFIX = '", rel$TAG_PREFIX[i], "',
+        TAG_NUM = '", rel$TAG_NUM[i], "',
+        CARAPACE_LENGTH = '", rel$CARAPACE_LENGTH[i], "',
+        SEX = '", rel$SEX[i], "',
+        SHELL = '", rel$SHELL[i], "',
+        CLAW = '", rel$CLAW[i], "',
+        LAT_DEGREES = '", rel$LAT_DEGREES[i], "',
+        LAT_MINUTES = '", rel$LAT_MINUTES[i], "',
+        LON_DEGREES = '", rel$LON_DEGREES[i], "',
+        LON_MINUTES = '", rel$LON_MINUTES[i], "',
+        LATDDMM_MM = '", rel$LATDDMM_MM[i], "',
+        LONDDMM_MM = '", rel$LONDDMM_MM[i], "',
+        LAT_DD = '", rel$LAT_DD[i], "',
+        LON_DD = '", rel$LON_DD[i], "',
+        REL_DATE = '", rel$REL_DATE[i], "',
+        COMMENTS = '", rel$COMMENTS[i], "'
+    WHERE TAG_ID = '", rel$TAG_ID[i], "'", sep = "")
+      if(db %in% "local"){dbBegin(con)}
+      result <- dbSendQuery(con, update_query)
+      dbCommit(con)
+      dbClearResult(result)
+            }
           }
 
         }
@@ -384,7 +420,8 @@ if(!return_error & return_warning){
         dbDisconnect(con)
 
         ### show interactive info window if there were any tags found to be already entered
-        if(nrow(entered)>0){
+        if(nrow(entered)>0 & !overwrite.tags){
+
           # Dynamically render new UI elements
           output$dynamicUI <- renderUI({
             fluidPage(
@@ -430,11 +467,12 @@ if(!return_error & return_warning){
               }
             )
 
-
         }else{
+          no.tags.found = " and none of the tags were found to already exist"
+          if(overwrite.tags){no.tags.found = ""}
           output$dynamicUI <- renderUI({
             fluidPage(
-            h3("All releases uploaded successfully! There were no errors and none of the tags were found to already exist. Close this window.")
+            h3(pase0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
             ) })
           }
 
@@ -480,6 +518,44 @@ if(!return_error & return_warning){
     result <- dbSendQuery(con, sql)
     dbCommit(con)
     dbClearResult(result)
+
+  }else{
+    if(overwrite.tags){
+      update_query <- paste("UPDATE ", table_name,
+                            " SET SAMPLER = '", rel$SAMPLER[i], "',
+        SAMPLER_2 = '", rel$SAMPLER_2[i], "',
+        AFFILIATION = '", rel$AFFILIATION[i], "',
+        VESSEL = '", rel$VESSEL[i], "',
+        CAPTAIN = '", rel$CAPTAIN[i], "',
+        PORT = '", rel$PORT[i], "',
+        MANAGEMENT_AREA = '", rel$MANAGEMENT_AREA[i], "',
+        DAY = '", rel$DAY[i], "',
+        MONTH = '", rel$MONTH[i], "',
+        YEAR = '", rel$YEAR[i], "',
+        TAG_COLOR = '", rel$TAG_COLOR[i], "',
+        TAG_PREFIX = '", rel$TAG_PREFIX[i], "',
+        TAG_NUM = '", rel$TAG_NUM[i], "',
+        CARAPACE_LENGTH = '", rel$CARAPACE_LENGTH[i], "',
+        SEX = '", rel$SEX[i], "',
+        SHELL = '", rel$SHELL[i], "',
+        CLAW = '", rel$CLAW[i], "',
+        LAT_DEGREES = '", rel$LAT_DEGREES[i], "',
+        LAT_MINUTES = '", rel$LAT_MINUTES[i], "',
+        LON_DEGREES = '", rel$LON_DEGREES[i], "',
+        LON_MINUTES = '", rel$LON_MINUTES[i], "',
+        LATDDMM_MM = '", rel$LATDDMM_MM[i], "',
+        LONDDMM_MM = '", rel$LONDDMM_MM[i], "',
+        LAT_DD = '", rel$LAT_DD[i], "',
+        LON_DD = '", rel$LON_DD[i], "',
+        REL_DATE = '", rel$REL_DATE[i], "',
+        COMMENTS = '", rel$COMMENTS[i], "'
+    WHERE TAG_ID = '", rel$TAG_ID[i], "'", sep = "")
+
+      if(db %in% "local"){dbBegin(con)}
+      result <- dbSendQuery(con, update_query)
+      dbCommit(con)
+      dbClearResult(result)
+    }
   }
 
 }
@@ -487,7 +563,8 @@ if(!return_error & return_warning){
   dbDisconnect(con)
 
   ### show interactive info window if there were any tags found to be already entered
- if(nrow(entered)>0){
+ if(nrow(entered)>0 & !overwrite.tags){
+
   # Define UI for application
   ui <- fluidPage(
     titlePanel("Upload Success!"),
@@ -536,8 +613,11 @@ if(!return_error & return_warning){
   # Run the application
   shinyApp(ui = ui, server = server)
 
+
  }else{
-   dlg_message("All releases uploaded successfully! There were no errors and none of the tags were found to already exist.")
+   no.tags.found = " and none of the tags were found to already exist"
+   if(overwrite.tags){no.tags.found = ""}
+   dlg_message(paste0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
   }
 
   }

@@ -6,6 +6,7 @@
 \usage{
 upload_releases(
   db = NULL,
+  overwrite.tags = F,
   oracle.user = if (exists("oracle.personal.user", inherits = T)) oracle.personal.user
     else NULL,
   oracle.password = if (exists("oracle.personal.password", inherits = T))
