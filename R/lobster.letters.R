@@ -4,6 +4,7 @@
 #' @import ROracle DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
 lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
+                           max.pixels = 400000, map.res = 0.9,
                            oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                            oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                            oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -203,8 +204,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     return(print(paste("Error: There are fishers in LBT_PEOPLE with no associated LICENSE_AREA and their captures can't be localized within an area. Update LICENSE_AREA for:",paste(no.area$NAME,collapse = ", "),"and try again.")))
   }
 
-  tid = da$TAG_ID[which(da$REWARDED == 'no')] #Get tag ids of unrewarded returns
-  da = da[which(da$TAG_ID %in% tid),] #Get all required data for plotting tag histories of unrewarded
+  if(only.unrewarded){
+    tid = da$TAG_ID[which(da$REWARDED == 'no')] #Get tag ids of unrewarded returns
+    da = da[which(da$TAG_ID %in% tid),] #Get all required data for plotting tag histories of unrewarded
+  }
 
   perlist = list() #set up list to hold relevant data
   persplit = split(da, da$NAME)
@@ -341,7 +344,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
         #per$mapdisclaimer = getBetween(lettertxt, "PARAGRAPH mapdisclaimer")   ### not needed anymore once we got better maps
 
 
-        generate_maps(people = per$name, only.unrewarded = only.unrewarded, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
+        generate_maps(map.res = map.res, max.pixels = max.pixels, people = per$name, only.unrewarded = only.unrewarded, output.location = paste0(output.location,"/maps"), db = db, inset.option = F)
 
         ##remove special characters (apostrophes) in map file names, no good way of dealing with these in Latex file sourcing
         for (file in list.files(path = paste0(output.location,"/maps"), pattern = per$name, full.names = T)){
