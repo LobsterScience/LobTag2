@@ -161,6 +161,17 @@ upload_recaptures <- function(db = NULL, backups = T,
     }
   ")),
 
+
+    ### Disable mouse scrolling in numeric fields (too easy to accidentally change value)
+    tags$script(HTML("
+  $(document).on('shiny:bound', function() {
+    $('input[type=\"number\"]').on('wheel', function(e) {
+      e.preventDefault();
+    });
+  });
+")),
+
+
     # Sidebar layout
     sidebarLayout(
 
