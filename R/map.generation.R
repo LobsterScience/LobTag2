@@ -655,7 +655,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ## graphing
 
     ## LFA lines
-    LFA.line <- read_sf("C:/LOBTAG/data/LFA polylines")
+    LFA.line <- read_sf("C:/LOBTAG/data")
 
     ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
 
