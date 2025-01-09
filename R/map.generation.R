@@ -384,7 +384,7 @@ for (p in people){
 
 #' @title map_by_factor
 #' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs RSQLite DBI raster ggspatial
-#' @description specific mapping function for mapping releases and returns by custom factor
+#' @description general mapping function for mapping releases and returns by custom factor
 #' @export
 
 map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
@@ -655,7 +655,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ## graphing
 
     ## LFA lines
-    LFA.line <- read_sf("C:/bio.data/bio.lobster/data/maps/LFA polylines")
+    LFA.line <- read_sf("C:/LOBTAG/data")
 
     ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
 
