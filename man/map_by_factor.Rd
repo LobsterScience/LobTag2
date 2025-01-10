@@ -21,11 +21,11 @@ map_by_factor(
   set.inset = T,
   max.pixels = 8e+05,
   map.res = 0.9,
-  inset.map = T,
+  inset.map = F,
   point.size = 1.5,
   file.type = "pdf",
   dpi = 900,
-  margin = 1,
+  zoom.out = 1,
   oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
   oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
     NULL,
@@ -33,5 +33,5 @@ map_by_factor(
 )
 }
 \description{
-specific mapping function for mapping releases and returns by custom factor
+general mapping function for mapping releases and returns by custom factor
 }

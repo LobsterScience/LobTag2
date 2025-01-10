@@ -630,7 +630,7 @@ upload_recaptures <- function(db = NULL, backups = T,
 
 
 #' @title batch_upload_recaptures
-#' @import dplyr ROracle DBI shiny DT svDialogs readxl openxlsx
+#' @import dplyr ROracle DBI shiny DT svDialogs readxl
 #' @description batch uploads tag recaptures data
 #' @export
 batch_upload_recaptures <- function(db = NULL, backups = T,
