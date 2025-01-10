@@ -31,7 +31,6 @@ Imports:
     leaflet,
     leaflet.extras,
     lubridate,
-    openxlsx,
     rmarkdown,
     stringi,
     terra
