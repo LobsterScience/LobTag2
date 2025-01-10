@@ -696,7 +696,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     base <- normalize_raster_brick(base)
 
     a <- gg_raster(base, maxpixels=max.pixels)+
-      geom_sf(data=LFA.line, colour = "white")+
+      geom_sf(data=LFA.line, colour = "white", size= 1, linetype = "dashed", alpha = 0.5)+
       ggspatial::annotation_scale(data = sf_rel, bar_cols = c("grey", "white"), text_col = "white")+
       ggtitle(paste(map.by,"-",i))
     if(add.paths){
