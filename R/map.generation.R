@@ -389,8 +389,8 @@ for (p in people){
 
 map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
-                          output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=T,
-                          point.size = 1.5, file.type = "pdf", dpi= 900, margin = 1,
+                          output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=F,
+                          point.size = 1.5, file.type = "pdf", dpi= 900, zoom.out = 1,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -571,9 +571,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     # maxx = maxx + ylen/3
 
     ##visually scale plotting area a bit wider
-    if(margin>0){
-      margin = margin/100
-      scale = (maxy-miny)*margin
+    if(zoom.out>0){
+      zoom.out = zoom.out/100
+      scale = (maxy-miny)*zoom.out
       maxx = maxx+scale
       minx = minx-scale
       maxy = maxy+scale
@@ -707,7 +707,7 @@ if(is.null(group.by)){
   if(tab %in% c("releases","RELEASES")){
     if(show.recaptures){
       a <- a+geom_sf(data=sf_rel, size=point.size,aes(colour = "Releases"))+
-        geom_sf(data=sf_rec, size=1.5, aes(color = "Recaptures"))+
+        geom_sf(data=sf_rec, size=point.size, aes(color = "Recaptures"))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))
     }else{
@@ -767,13 +767,13 @@ if(is.null(group.by)){
       if(group.by %in% colnames(sf_rel)){
         a <- a+
           geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]], shape = Event))+
-          geom_sf(data=sf_rel, size=1.5, aes(colour = .data[[group.by]], shape = Event))+
+          geom_sf(data=sf_rel, size=point.size, aes(colour = .data[[group.by]], shape = Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
           geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]]))+
-          geom_sf(data=sf_rel, size=1.5, aes(colour = "Releases"))+
+          geom_sf(data=sf_rel, size=point.size, aes(colour = "Releases"))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }
@@ -816,8 +816,14 @@ if(inset.map){
 }else{outplot <- a}
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
-    name.by =ifelse(!is.null(map.by),map_fact,"")
-    ggsave(filename = paste0(tab," ",name.by," ",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+    if(is.null(map.by)){
+      name.by <- ""
+      space <- ""
+    }else{
+      name.by <- map_fact
+      space <- "_"
+    }
+    ggsave(filename = paste0(tab,space,name.by,"_",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
 
   }
