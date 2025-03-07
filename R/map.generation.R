@@ -285,6 +285,10 @@ for (p in people){
     sf::st_crs(labs.sf) <- sf::st_crs(4326)
 
     ## graphing
+
+     ## LFA lines
+    LFA.line <- read_sf("C:/LOBTAG/data")
+    sf::st_crs(LFA.line) <- 4326
     ## since reprojecting the raster may have created problems with colour values, try normalizing these if graphing doesn't work the first time
 
     ## function to normalize the colour values of a reprojected raster brick object for graphing with with gg_raster or other raster graphing functions
@@ -332,6 +336,7 @@ for (p in people){
       if(scale< 0.03){arrow.size = scale*10}else{arrow.size =0.3}
 
       a <- gg_raster(base, maxpixels=max.pixels)+
+        geom_sf(data=LFA.line, colour = "white", size= 1, linetype = "dashed", alpha = 0.5)+
         ggspatial::annotation_scale(data = path_sf, bar_cols = c("grey", "white"), text_col = "white")+
         ggtitle(paste(map.person,"-",i))+
         geom_sf(data=path_sf, colour = "red", linewidth=1.6, arrow = arrow(type = "open", length = unit(arrow.size, "inches")))+
@@ -344,12 +349,14 @@ for (p in people){
     ## inset map
       inset <- normalize_raster_brick(inset)
       b <- gg_raster(inset, maxpixels=300000)+
-        geom_sf(data = ext, colour = "red", alpha = 0.1)+
+        geom_sf(data = ext_sf, colour = "red", alpha = 0.1)+
+        geom_sf(data=LFA.line, colour = "white", size= 1, linetype = "dashed", alpha = 0.5)+
         coord_sf(expand = F)+
         theme(axis.title = element_blank(),
               axis.text  = element_blank(),
               axis.ticks = element_blank(),
-              plot.margin = unit(c(0.2,0.1,0.0,0.0),'lines'))
+              plot.margin = unit(c(0.2,0.1,0.0,0.0),'lines'))+
+        coord_sf(ylim=as.numeric(c(inset.lim$ymin,inset.lim$ymax)), xlim = as.numeric(c(inset.lim$xmin,inset.lim$xmax)), expand = F)
 
 
     b1 <- ggplotGrob(b)
