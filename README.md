@@ -2,7 +2,6 @@
 Installation
 
 Enter these lines into the R console to install the package:
-Install.packages('shiny')
 Install.packages('devtools')
 devtools::install_github("yutannihilation/ggsflabel")
 devtools::install_github('jakeelement/LobTag2')

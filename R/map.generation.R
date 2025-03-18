@@ -1,6 +1,6 @@
 
 #' @title generate_maps
-#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs RSQLite DBI raster ggspatial
+#' @import dplyr sf ggplot2 basemaps svDialogs RSQLite DBI raster ggspatial
 #' @description creates maps of tag movement for participants
 #' @export
 
@@ -9,6 +9,14 @@ generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NUL
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+
+  ## install any extra github packages need for mapping:
+  pkg.list <- c("ggsflabel") ## install any github package dependencies
+  pkg.install <- c("yutannihilation/ggsflabel")
+  if (!requireNamespace(pkg.list, quietly = TRUE)) {
+    devtools::install_github(pkg.install)
+  }
+  require(ggsflabel)
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
 
