@@ -380,8 +380,8 @@ for (p in people){
         annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
         #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
       # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
+      map.person <- iconv(map.person, from = "UTF-8", to = "ASCII//TRANSLIT") ## in case name contains accented e that create problems for ggsave
       ggsave(filename = paste0(map.person,i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
-
 
   }
 
