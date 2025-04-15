@@ -580,9 +580,9 @@ upload_recaptures <- function(db = NULL, backups = T,
               rec.tab <- left_join(rec.tab,peep.tab)
               rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
 
-              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
+              openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/","LBT_RECAPTURES.xlsx"), rowNames = F)
 
-              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+              openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/","LBT_PEOPLE.xlsx"), rowNames = F)
               print(paste0("Data backups stored in ",backup.dir))
             }
       )
@@ -1186,8 +1186,8 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         peep.tab <- peep.tab %>% rename(PERSON = NAME)
         rec.tab <- left_join(rec.tab,peep.tab)
         rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
-        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
-        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/","LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/","LBT_PEOPLE.xlsx"), rowNames = F)
         dbDisconnect(con)
         print(paste0("Data backups stored in ",backup.dir))
       }
@@ -1408,8 +1408,8 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         peep.tab <- peep.tab %>% rename(PERSON = NAME)
         rec.tab <- left_join(rec.tab,peep.tab)
         rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
-        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
-        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/","LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/","LBT_PEOPLE.xlsx"), rowNames = F)
         dbDisconnect(con)
         print(paste0("Data backups stored in ",backup.dir))
       }
@@ -1438,8 +1438,8 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         peep.tab <- peep.tab %>% rename(PERSON = NAME)
         rec.tab <- left_join(rec.tab,peep.tab)
         rec.tab <- rec.tab %>% dplyr::select(TAG_PREFIX, TAG_NUMBER,	DAY,	MONTH,	YEAR,	PERSON,	CIVIC,	TOWN,	PROV,	COUNTRY,	POST,	EMAIL,	PHO1,	PHO2,	AFFILIATION,	LICENSE_AREA,	PERSON_2,	LAT_DEGREE,	LAT_MINUTE,	LON_DEGREE,	LON_MINUTE,	LAT_DD,	LON_DD,	FATHOMS,	RELEASED,	CAPTAIN,	VESSEL,	MANAGEMENT_AREA,	CAPTURE_LENGTH,	SEX,	EGG_STATE,	REWARDED,	COMMENTS)
-        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_RECAPTURES.xlsx"), rowNames = F)
-        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/",oracle.user,"_LBT_PEOPLE.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(rec.tab, file = paste0(backup.dir,"/","LBT_RECAPTURES.xlsx"), rowNames = F)
+        openxlsx::write.xlsx(peep.tab, file = paste0(backup.dir,"/","LBT_PEOPLE.xlsx"), rowNames = F)
         dbDisconnect(con)
         print(paste0("Data backups stored in ",backup.dir))
       }
