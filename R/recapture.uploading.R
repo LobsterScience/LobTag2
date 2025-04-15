@@ -1209,25 +1209,13 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
     # Connect to database
     db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
-    ## check for already entered recapture events, then upload all new recaptures
+    ## Set variables and check for already entered recapture events, then upload all new recaptures
     entered =NULL
     for(i in 1:nrow(rec)){
 
        ##handle special characters
         person <- rec$PERSON[i]
         person <- escape_special_chars(person)
-
-      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
-      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",person,"'", sep = "")
-      check <- dbSendQuery(con, sql)
-      existing_event <- dbFetch(check)
-      entered <- rbind(entered,existing_event)
-      dbClearResult(check)
-
-      if(nrow(existing_event)==0){
-
-        #handle special characters
         person2 <- rec$PERSON_2[i]
         person2 <- escape_special_chars(person2)
         captain <- rec$CAPTAIN[i]
@@ -1255,6 +1243,16 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         affiliation <- escape_special_chars(affiliation)
         license_area <- rec$LICENSE_AREA[i]
         license_area <- escape_special_chars(license_area)
+
+      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
+      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+      sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",person,"'", sep = "")
+      check <- dbSendQuery(con, sql)
+      existing_event <- dbFetch(check)
+      entered <- rbind(entered,existing_event)
+      dbClearResult(check)
+
+      if(nrow(existing_event)==0){
 
         sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",person,"','",person2,"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",captain,"','",vessel,"','",rec$YEAR[i],"','",management_area,"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','",rec$REWARDED[i],"','",comments,"')", sep = "")
         if(db %in% "local"){dbBegin(con)}
