@@ -3,8 +3,8 @@ Type: Package
 Title: Functions for creating and managing tagging databases, with mapping functionality
 Version: 0.1.0
 Author: Geraint Element, inspired by LobTag by Brent Cameron
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: Functions allow controlled uploading of releases and recaptures data with error checking, to create an SQL-based local or Oracle database. Additional functions generate plausible paths of animal movement using raster depth maps. Additional functions allow the user to generate detailed maps of this movement.
+Maintainer: The package maintainer <geraint.element@dfo-mpo.gc.ca>
+Description: Functions allow controlled uploading of releases and recaptures data with error checking, to create an SQL-based local or Oracle database. Additional functions generate plausible paths of animal movement using raster maps. Additional functions allow the user to generate detailed maps of this movement.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
