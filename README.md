@@ -2,7 +2,7 @@
 Installation
 
 Enter these lines into the R console to install the package:
-Install.packages('devtools')
+install.packages("devtools")
 devtools::install_github("yutannihilation/ggsflabel")
 devtools::install_github('LobsterScience/LobTag2')
 
