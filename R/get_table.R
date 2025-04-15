@@ -41,6 +41,7 @@ if(table %in% c("people","People","PEOPLE")){
   people <<- fetch(peeps)
 }
 
+  dbDisconnect(con)
 }
 
 
