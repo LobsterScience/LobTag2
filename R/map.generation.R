@@ -402,7 +402,7 @@ for (p in people){
 #' @description general mapping function for mapping releases and returns by custom factor
 #' @export
 
-map_by_factor <- function(db = NULL, factor.from = NULL, map.by=NULL, filter.maps.for=NULL, group.by=NULL, all.releases = F,
+map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.for=NULL, map.by=NULL, factor.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
                           output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=F,
                           point.size = 1.5, file.type = "pdf", dpi= 900, zoom.out = 1,
@@ -453,46 +453,57 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   releases <- fetch(releases)
 
   select.factors <- c("TAG_ID")    ### minimal information that can be included
-  tab <- sub(paste0(":", ".*"), "", factor.from)
+  tab <- sub(paste0(":", ".*"), "", filter.from)
 
-  if(!is.null(map.by)){
-    map_fact <- sub(paste0(".*", ":"), "", map.by)
-    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("map_fact" = all_of(map_fact))}
-    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("map_fact" = all_of(map_fact))}
-    select.factors <- c(select.factors,"map_fact")
-
+  if(!is.null(filter.by)){
+    filter_by <- sub(paste0(".*", ":"), "", filter.by)
+    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("filter_by" = all_of(filter_by))}
+    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("filter_by" = all_of(filter_by))}
   }else{
-    ### defaults to whole dataset if no map.by is chosen
-    releases$map_fact = "all"
-    recaptures$map_fact = "all"
-    select.factors <- c(select.factors,"map_fact")
+    releases$filter_by = "all"
+    recaptures$filter_by = "all"
+  }
+
+    if(!is.null(map.by)){
+    map_by <- sub(paste0(".*", ":"), "", map.by)
+    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("map_by" = all_of(map_by))}
+    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("map_by" = all_of(map_by))}
+    }else{
+      releases$map_by = "all"
+      recaptures$map_by = "all"
     }
 
-  if(!is.null(group.by)){
-    select.factors <- c(select.factors,group.by)
+  select.factors <- c(select.factors,"filter_by","map_by")
+
+  if(!is.null(factor.by)){
+    select.factors <- c(select.factors,factor.by)
   }
 
   if(tab %in% c("releases","RELEASES")){
     rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
 
-    ## include optional filter for specific value of mapping factor
-    if(!is.null(filter.maps.for)){rel.dat <- rel.dat %>% filter(map_fact %in% filter.maps.for)}
+    ## include optional filter for specific values of factor
+    if(!is.null(filter.for)){rel.dat <- rel.dat %>% filter(filter_by %in% filter.for)}
 
-    rel <- releases %>% dplyr::select(all_of(select.factors))
-    rec <- left_join(recaptures,(rel %>% dplyr::select(TAG_ID,map_fact)))
-    rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
-    loop.factor = rel.dat$map_fact
-    }
+      rec <- left_join((rel.dat %>% dplyr::select(TAG_ID,filter_by)),recaptures)
+      rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
+      loop.factor = rel.dat$map_by
+  }
+
   if(tab %in% c("recaptures","RECAPTURES")){
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
 
-    ## include optional filter for specific value of mapping factor
-    if(!is.null(filter.maps.for)){rec.dat <- rec.dat %>% filter(map_fact %in% filter.maps.for)}
+    ## include optional filter for specific values of factor
+    if(!is.null(filter.for)){rec.dat <- rec.dat %>% filter(filter_by %in% filter.for)}
 
-    rec <- recaptures %>% dplyr::select(all_of(select.factors))
-    rel<- left_join(releases,(rec %>% dplyr::select(TAG_ID,map_fact)))
+    #rec <- recaptures %>% dplyr::select(all_of(select.factors))
+    if(all.releases){
+      rel<- left_join(releases, (rec.dat %>% dplyr::select(TAG_ID,filter_by)))
+    }else{
+      rel<- left_join((rec.dat %>% dplyr::select(TAG_ID,filter_by)), releases)
+    }
     rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
-    loop.factor = rec.dat$map_fact
+    loop.factor = rec.dat$map_by
   }
 
 
@@ -513,12 +524,11 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   ##
   dbDisconnect(con)
 
-
   for(i in unique(loop.factor)){
 
     ##point geometry
-    rel.points <- rel.dat %>% filter(map_fact %in% i)
-    rec.points <- rec.dat %>% filter(map_fact %in% i)
+    rel.points <- rel.dat %>% filter(map_by %in% i)
+    rec.points <- rec.dat %>% filter(map_by %in% i)
 
     sf_rel <- sf::st_as_sf(rel.points, coords = c("LON_DD","LAT_DD"))
     sf::st_crs(sf_rel) <- sf::st_crs(4326)
@@ -718,7 +728,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       p <- geom_sf(data = path_sf, colour = "yellow")
       a <- a+p
     }
-if(is.null(group.by)){
+if(is.null(factor.by)){
   if(tab %in% c("releases","RELEASES")){
     if(show.recaptures){
       a <- a+geom_sf(data=sf_rel, size=point.size,aes(colour = "Releases"))+
@@ -752,16 +762,16 @@ if(is.null(group.by)){
   if(tab %in% c("releases","RELEASES")){
     if(show.recaptures){
 
-      if(group.by %in% colnames(sf_rec)){
+      if(factor.by %in% colnames(sf_rec)){
         a <- a+
-          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[group.by]], shape =Event))+
-          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]], shape =Event))+
+          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by]], shape =Event))+
+          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]], shape =Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
           geom_sf(data=sf_rec, size=point.size, aes(colour = "Recaptures"))+
-          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]]))+
+          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]]))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }
@@ -769,7 +779,7 @@ if(is.null(group.by)){
 
     }else{
       a <- a+
-      geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[group.by]]))+
+      geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]]))+
       coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
       theme(plot.margin = margin(t = 73))+
       ggtitle("Releases")
@@ -779,15 +789,15 @@ if(is.null(group.by)){
   if(tab %in% c("recaptures","RECAPTURES")){
     if(show.releases){
 
-      if(group.by %in% colnames(sf_rel)){
+      if(factor.by %in% colnames(sf_rel)){
         a <- a+
-          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]], shape = Event))+
-          geom_sf(data=sf_rel, size=point.size, aes(colour = .data[[group.by]], shape = Event))+
+          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[factor.by]], shape = Event))+
+          geom_sf(data=sf_rel, size=point.size, aes(colour = .data[[factor.by]], shape = Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
-          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]]))+
+          geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[factor.by]]))+
           geom_sf(data=sf_rel, size=point.size, aes(colour = "Releases"))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
@@ -795,7 +805,7 @@ if(is.null(group.by)){
 
     }else{
       a <- a+
-        geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[group.by]]))+
+        geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[factor.by]]))+
         coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
         theme(plot.margin = margin(t = 73))+
         ggtitle("Recaptures")
@@ -832,13 +842,20 @@ if(inset.map){
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
     if(is.null(map.by)){
-      name.by <- ""
+      name.map <- ""
       space <- ""
     }else{
-      name.by <- map_fact
+      name.map <- map_by
       space <- "_"
     }
-    ggsave(filename = paste0(tab,space,name.by,"_",i,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+    if(is.null(filter.by)){
+      name.filter <- ""
+      filter.values <- ""
+    }else{
+      name.filter <- filter_by
+      filter.values <- filter.for
+    }
+    ggsave(filename = paste0(tab,space,name.map,"_",i,name.filter,filter.values,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
 
   }
@@ -856,10 +873,10 @@ if(inset.map){
   # library(raster)
 
   #db = NULL
-  # factor.from = "RELEASES"
+  # filter.from = "RELEASES"
   # map.by= NULL
-  # filter.maps.for=NULL
-  # group.by=NULL
+  # filter.for=NULL
+  # factor.by=NULL
   # all.releases = T
   # show.releases = T
   # show.recaptures = T

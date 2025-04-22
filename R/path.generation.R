@@ -222,6 +222,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   ## create paths
   x <- x %>% rename(PID=TAG_ID)
 
+  dftowrite = NULL
+  df2towrite = NULL
+  dxtowrite = NULL
 
   if(nrow(x) == 0){base::message("No new paths to create!")}else{
 
@@ -343,9 +346,6 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ###############################################
     count = 1
     previd = ""
-    dftowrite = NULL
-    df2towrite = NULL
-    dxtowrite = NULL
 
     x <- x %>% arrange(PID,REC_DATE)
     dat <- arrange(dat,TID)
