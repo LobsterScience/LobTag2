@@ -457,12 +457,16 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(!is.null(filter.by)){
     filter_by <- sub(paste0(".*", ":"), "", filter.by)
-    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("filter_by" = all_of(filter_by))}
-    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("filter_by" = all_of(filter_by))}
+    # if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("filter_by" = all_of(filter_by))}
+    # if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("filter_by" = all_of(filter_by))}
+    if(tab %in% c("releases","RELEASES")){releases$filter_by = releases[[filter_by]]}
+    if(tab %in% c("recaptures","RECAPTURES")){recaptures$filter_by = recaptures[[filter_by]]}
   }else{
     releases$filter_by = "all"
     recaptures$filter_by = "all"
   }
+
+  select.factors <- c(select.factors,"filter_by")
 
     if(!is.null(map.by)){
     map_by <- sub(paste0(".*", ":"), "", map.by)
@@ -473,7 +477,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       recaptures$map_by = "all"
     }
 
-  select.factors <- c(select.factors,"filter_by","map_by")
+  select.factors <- c(select.factors,"map_by")
 
   if(!is.null(factor.by)){
     select.factors <- c(select.factors,factor.by)
@@ -485,7 +489,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ## include optional filter for specific values of factor
     if(!is.null(filter.for)){rel.dat <- rel.dat %>% filter(filter_by %in% filter.for)}
 
-      rec <- left_join((rel.dat %>% dplyr::select(TAG_ID,filter_by)),recaptures)
+      rec <- left_join((rel.dat %>% dplyr::select(select.factors)),recaptures)
       rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
       loop.factor = rel.dat$map_by
   }
@@ -498,9 +502,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     #rec <- recaptures %>% dplyr::select(all_of(select.factors))
     if(all.releases){
-      rel<- left_join(releases, (rec.dat %>% dplyr::select(TAG_ID,filter_by)))
+      rel<- left_join(releases, (rec.dat %>% dplyr::select(select.factors)))
     }else{
-      rel<- left_join((rec.dat %>% dplyr::select(TAG_ID,filter_by)), releases)
+      rel<- left_join((rec.dat %>% dplyr::select(select.factors)), releases)
     }
     rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
     loop.factor = rec.dat$map_by
@@ -528,7 +532,19 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     ##point geometry
     rel.points <- rel.dat %>% filter(map_by %in% i)
+    if(any(rel.points$LAT_DD %in% NA) | any(rel.points$LON_DD %in% NA)){
+      missing.rel <- max(nrow(rel.points %>% filter(rel.points$LAT_DD %in% NA)),
+      nrow(rel.points %>% filter(rel.points$LON_DD %in% NA)))
+      rel.points <- rel.points %>% filter(!rel.points$LAT_DD %in% NA,!rel.points$LON_DD %in% NA)
+      warning(paste("Warning! There are",missing.rel,"tags in the selection that don't have release coordinates.Recaptures for these will still be mapped."), immediate. = T)
+    }
     rec.points <- rec.dat %>% filter(map_by %in% i)
+    if(any(rec.points$LAT_DD %in% NA) | any(rec.points$LON_DD %in% NA)){
+      missing.rec <- max(nrow(rec.points %>% filter(rec.points$LAT_DD %in% NA)),
+                         nrow(rec.points %>% filter(rec.points$LON_DD %in% NA)))
+      rec.points <- rec.points %>% filter(!rec.points$LAT_DD %in% NA,!rec.points$LON_DD %in% NA)
+      warning(paste("Warning! There are",missing.rec,"tags in the recaptures selection that don't have recapture coordinates. Releases for these will still be mapped."), immediate. = T)
+    }
 
     sf_rel <- sf::st_as_sf(rel.points, coords = c("LON_DD","LAT_DD"))
     sf::st_crs(sf_rel) <- sf::st_crs(4326)
@@ -597,8 +613,8 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     ##visually scale plotting area a bit wider
     if(zoom.out>0){
-      zoom.out = zoom.out/100
-      scale = (maxy-miny)*zoom.out
+      zoom.fact = zoom.out/100
+      scale = (maxy-miny)*zoom.fact
       maxx = maxx+scale
       minx = minx-scale
       maxy = maxy+scale
@@ -843,9 +859,11 @@ if(inset.map){
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
     if(is.null(map.by)){
       name.map <- ""
+      map.id <- ""
       space <- ""
     }else{
       name.map <- map_by
+      map.id <- i
       space <- "_"
     }
     if(is.null(filter.by)){
@@ -853,9 +871,9 @@ if(inset.map){
       filter.values <- ""
     }else{
       name.filter <- filter_by
-      filter.values <- filter.for
+      filter.values <- paste(filter.for, collapse = ".")
     }
-    ggsave(filename = paste0(tab,space,name.map,"_",i,name.filter,filter.values,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+    ggsave(filename = paste0(tab,space,name.filter,"-",filter.values,"_",name.map,"-",map.id,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
 
   }
