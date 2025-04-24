@@ -398,7 +398,7 @@ for (p in people){
 
 
 #' @title map_by_factor
-#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs RSQLite DBI raster ggspatial
+#' @import dplyr sf ggplot2 ggsflabel basemaps svDialogs RSQLite DBI raster ggspatial lubridate
 #' @description general mapping function for mapping releases and returns by custom factor
 #' @export
 
@@ -450,6 +450,13 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   releases <- dbSendQuery(con, query)
   releases <- fetch(releases)
 
+  ##create a few more useful filtering variables
+  recaptures$MONTH = as.character(month(recaptures$REC_DATE))
+  recaptures$DAY = as.character(day(recaptures$REC_DATE))
+
+  releases$MONTH = as.character(month(releases$REL_DATE))
+  releases$DAY = as.character(day(releases$REL_DATE))
+
   select.factors <- c("TAG_ID")    ### minimal information that can be included
   tab <- sub(paste0(":", ".*"), "", filter.from)
 
@@ -489,9 +496,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
     factor.by1 = NULL
-    if(factor.by %in% colnames(recaptures)){
+    if(!is.null(factor.by) && factor.by %in% colnames(recaptures)){
       factor.by1 <- paste0(factor.by, "1")
       recaptures <- recaptures %>% rename_with(~ factor.by1, .cols = all_of(factor.by))
+      if(factor.by1 %in% "TAG_ID1"){recaptures$TAG_ID = recaptures$TAG_ID1} ## recover the joining variable if it gets lost here
     }
       rec <- left_join((rel.dat %>% dplyr::select(select.factors)),recaptures)
       if(!is.null(factor.by1)){
@@ -510,9 +518,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
     factor.by1 = NULL
-    if(factor.by %in% colnames(releases)){
+    if(!is.null(factor.by) && factor.by %in% colnames(releases)){
       factor.by1 <- paste0(factor.by, "1")
       releases <- releases %>% rename_with(~ factor.by1, .cols = all_of(factor.by))
+      if(factor.by1 %in% "TAG_ID1"){releases$TAG_ID = releases$TAG_ID1}
     }
 
     if(all.releases){
