@@ -404,8 +404,8 @@ for (p in people){
 
 map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.for=NULL, map.by=NULL, factor.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
-                          output.location = NULL, set.output = T, set.inset=T,max.pixels = 800000, map.res = 0.9, inset.map=F,
-                          point.size = 1.5, file.type = "pdf", dpi= 900, zoom.out = 1,
+                          max.pixels = 800000, map.res = 0.9, inset.map=F, set.inset=T, zoom.out = 1,
+                          point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
@@ -431,13 +431,11 @@ map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.
   ####################################################### Main Function:
 
 
-  if(set.output){
-    ## let user select output file location for maps
-    if(is.null(output.location)){
-      dlg_message("In the following window, choose the directory where you want to send your maps.")
-      output.location <- dlg_dir(filter = dlg_filters["csv",])$res
-    }
-  }
+      ## let user select output file location for maps
+      if(is.null(output.location)){
+        dlg_message("In the following window, choose the directory where you want to send your maps.")
+        output.location <- dlg_dir(filter = dlg_filters["csv",])$res
+      }
 
   ### open db connection
 db_connection(db, oracle.user, oracle.password, oracle.dbname)
@@ -489,8 +487,18 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ## include optional filter for specific values of factor
     if(!is.null(filter.for)){rel.dat <- rel.dat %>% filter(filter_by %in% filter.for)}
 
+    ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
+    factor.by1 = NULL
+    if(factor.by %in% colnames(recaptures)){
+      factor.by1 <- paste0(factor.by, "1")
+      recaptures <- recaptures %>% rename_with(~ factor.by1, .cols = all_of(factor.by))
+    }
       rec <- left_join((rel.dat %>% dplyr::select(select.factors)),recaptures)
-      rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
+      if(!is.null(factor.by1)){
+        rec.dat <- rec %>% dplyr::select(select.factors,factor.by1,"LAT_DD","LON_DD","REC_DATE")
+      }else{
+        rec.dat <- rec %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REC_DATE")
+      }
       loop.factor = rel.dat$map_by
   }
 
@@ -500,13 +508,24 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     ## include optional filter for specific values of factor
     if(!is.null(filter.for)){rec.dat <- rec.dat %>% filter(filter_by %in% filter.for)}
 
-    #rec <- recaptures %>% dplyr::select(all_of(select.factors))
+    ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
+    factor.by1 = NULL
+    if(factor.by %in% colnames(releases)){
+      factor.by1 <- paste0(factor.by, "1")
+      releases <- releases %>% rename_with(~ factor.by1, .cols = all_of(factor.by))
+    }
+
     if(all.releases){
       rel<- left_join(releases, (rec.dat %>% dplyr::select(select.factors)))
     }else{
       rel<- left_join((rec.dat %>% dplyr::select(select.factors)), releases)
     }
-    rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
+
+    if(!is.null(factor.by1)){
+      rel.dat <- rel %>% dplyr::select(select.factors,factor.by1,"LAT_DD","LON_DD","REL_DATE")
+    }else{
+      rel.dat <- rel %>% dplyr::select(select.factors,"LAT_DD","LON_DD","REL_DATE")
+    }
     loop.factor = rec.dat$map_by
   }
 
@@ -778,16 +797,16 @@ if(is.null(factor.by)){
   if(tab %in% c("releases","RELEASES")){
     if(show.recaptures){
 
-      if(factor.by %in% colnames(sf_rec)){
+      if(!is.null(factor.by1) && factor.by1 %in% colnames(sf_rec)){
         a <- a+
-          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by]], shape =Event))+
           geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]], shape =Event))+
+          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by1]], shape =Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
         a <- a+
-          geom_sf(data=sf_rec, size=point.size, aes(colour = "Recaptures"))+
           geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]]))+
+          geom_sf(data=sf_rec, size=point.size, aes(colour = "Recaptures"))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }
@@ -805,10 +824,10 @@ if(is.null(factor.by)){
   if(tab %in% c("recaptures","RECAPTURES")){
     if(show.releases){
 
-      if(factor.by %in% colnames(sf_rel)){
+      if(!is.null(factor.by1) && factor.by1 %in% colnames(sf_rel)){
         a <- a+
           geom_sf(data=sf_rec, size=point.size,aes(colour = .data[[factor.by]], shape = Event))+
-          geom_sf(data=sf_rel, size=point.size, aes(colour = .data[[factor.by]], shape = Event))+
+          geom_sf(data=sf_rel, size=point.size, aes(colour = .data[[factor.by1]], shape = Event))+
           coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
           theme(plot.margin = margin(t = 73))
       }else{
@@ -873,8 +892,12 @@ if(inset.map){
       name.filter <- filter_by
       filter.values <- paste(filter.for, collapse = ".")
     }
-    ggsave(filename = paste0(tab,space,name.filter,"-",filter.values,"_",name.map,"-",map.id,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
-
+    if(is.null(factor.by)){
+      factor.name <- ""
+    }else{
+      factor.name <- paste0("_Factor-",factor.by)
+    }
+    ggsave(filename = paste0(tab,space,name.filter,"-",filter.values,"_",name.map,"-",map.id,factor.name,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
   }
 
