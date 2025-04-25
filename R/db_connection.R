@@ -1,12 +1,18 @@
 
 #' @title db_connection
-#' @import dplyr RSQLite DBI ROracle
+#' @import dplyr RSQLite DBI
 #' @description establishes connection to databse of users choosing
 #' @export
 
 db_connection = function(db = NULL, oracle.user = NULL, oracle.password = NULL, oracle.dbname = NULL){
 
   if(db %in% "Oracle"){
+
+    if (!requireNamespace("ROracle", quietly = TRUE)) {
+      install.packages("ROracle")
+    }
+    require(ROracle)
+
     tryCatch({
       drv <- DBI::dbDriver("Oracle")
       con <<- ROracle::dbConnect(drv, username = oracle.user, password = oracle.password, dbname = oracle.dbname)
