@@ -12,13 +12,8 @@ devtools::install_github('LobsterScience/LobTag2')
 You may need to update some of your packages while installing if you have older versions of dependencies installed.
 After installation, find the location of your user guide by entering:
 
-system.file("data", "user_guide.pptx", package = "LobTag2")
-
-Read the user guide for more info.
-
-Likewise, the location of your template excel files for data entry is found with:
-
-system.file("extdata", package = "LobTag2")
+When you load the package you should get a message telling you where to find the user guide. Read the user guide for more info.
+Loading the package creates a folder called LOBTAG on your C: drive, all of your files (user guide, data upload templates, extra data, etc. can be found here).
 
 Getting a Mapbox token:
 You will need an account with Mapbox to use the mapping functionality. Setting up an account is quick and easy, just go to: 
