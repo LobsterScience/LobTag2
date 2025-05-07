@@ -488,7 +488,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     select.factors <- c(select.factors,factor.by)
   }
 
-  if(tab %in% c("releases","RELEASES")){
+  if(tab %in% c("releases","RELEASES","Releases")){
     rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
 
     ## include optional filter for specific values of factor
@@ -510,7 +510,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       loop.factor = rel.dat$map_by
   }
 
-  if(tab %in% c("recaptures","RECAPTURES")){
+  if(tab %in% c("recaptures","RECAPTURES","Recaptures")){
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
 
     ## include optional filter for specific values of factor
