@@ -444,11 +444,24 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   recaptures <- dbSendQuery(con, query)
   recaptures <- fetch(recaptures)
 
+  ##give warning if there are no recaptures at all for chosen dataset:
+  if(nrow(recaptures)==0){
+    warning("Warning! There are no recaptures for the chosen dataset")
+    recaptures[1,]=NA
+    immediate. = T
+  }
+
   cap.tags <- recaptures$TAG_ID
   chosen.str <- paste0("('",paste(cap.tags, collapse ="','"),"')")
   query = ifelse(all.releases,"SELECT * FROM LBT_RELEASES", paste0("SELECT * FROM LBT_RELEASES where TAG_ID in ",chosen.str))
   releases <- dbSendQuery(con, query)
   releases <- fetch(releases)
+
+  ##give warning if there are no releases at all for chosen dataset:
+  if(nrow(releases)==0){
+    warning("Warning! There are no releases for the chosen dataset", immediate. = T)
+    releases[1,]=NA
+  }
 
   ##create a few more useful filtering variables
   recaptures$MONTH = as.character(month(recaptures$REC_DATE))
@@ -886,27 +899,26 @@ if(inset.map){
     #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
     # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
     if(is.null(map.by)){
-      name.map <- ""
-      map.id <- ""
-      space <- ""
+      map.txt <- ""
     }else{
-      name.map <- map_by
-      map.id <- i
-      space <- "_"
+      map.txt <- paste0(map_by,"-",i,"_")
     }
     if(is.null(filter.by)){
-      name.filter <- ""
-      filter.values <- ""
+      filter.txt <- ""
     }else{
-      name.filter <- filter_by
-      filter.values <- paste(filter.for, collapse = ".")
+      filter.txt <- paste0(filter.by,paste(filter.for, collapse = "."),"_")
     }
     if(is.null(factor.by)){
-      factor.name <- ""
+      factor.txt <- ""
     }else{
-      factor.name <- paste0("_Factor-",factor.by)
+      factor.txt <- paste0("Factor-",factor.by)
     }
-    ggsave(filename = paste0(tab,space,name.filter,"-",filter.values,"_",name.map,"-",map.id,factor.name,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+    if(is.null(tag.prefix)){
+      program = ""
+    }else{
+      program = paste0(tag.prefix,"_")
+    }
+    ggsave(filename = paste0(program,tab,"_",filter.txt,map.txt,factor.txt,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
   }
 
