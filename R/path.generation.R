@@ -110,21 +110,28 @@ while(recheck){
   recaptures <- dbSendQuery(con, query)
   recaptures <- fetch(recaptures)
 
-  cap.samps <- paste0("('",paste(recaptures$TAG_ID, collapse ="','"),"')")
-  query = paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID in ",cap.samps)
-  releases <- dbSendQuery(con, query)
-  releases <- fetch(releases)
+  ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
+  releases <- do.call(rbind, lapply(unique(recaptures$TAG_ID), function(i) {
+    cap.samp <- paste0("'", i, "'")
+    query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
+    dbGetQuery(con, query)
+  }))
 
   ## Handle any special characters in names for SQL querying
   ### function for handling special characters
   escape_special_chars <- function(x) {
     if (is.character(x)) {
+      # Convert to UTF-8 and replace invalid characters with a space
+      x <- iconv(x, from = "", to = "UTF-8", sub = "[BAD char]")
+      # Optionally remove or flag the Unicode replacement character (�)
+      x <- gsub("\uFFFD", "[BAD char]", x)  # or use "[BAD char]" if you want to mark them
       # Escape single quotes (') and dashes (-) for Oracle
       x <- gsub("'", "''", x)
       x <- gsub("-", "\\-", x)
     }
     return(x)
   }
+
 
   rec.cols.to.handle <- c("PERSON","PERSON_2","VESSEL","CAPTAIN","MANAGEMENT_AREA","COMMENTS")
 for(i in 1:nrow(recaptures)){

@@ -451,11 +451,17 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     immediate. = T
   }
 
-  cap.tags <- recaptures$TAG_ID
-  chosen.str <- paste0("('",paste(cap.tags, collapse ="','"),"')")
-  query = ifelse(all.releases,"SELECT * FROM LBT_RELEASES", paste0("SELECT * FROM LBT_RELEASES where TAG_ID in ",chosen.str))
-  releases <- dbSendQuery(con, query)
-  releases <- fetch(releases)
+  if(all.releases){
+    releases <- dbSendQuery(con, "SELECT * FROM LBT_RELEASES")
+    releases <- fetch(releases)
+  }else{
+    ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
+    releases <- do.call(rbind, lapply(unique(recaptures$TAG_ID), function(i) {
+      cap.samp <- paste0("'", i, "'")
+      query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
+      dbGetQuery(con, query)
+    }))
+  }
 
   ##give warning if there are no releases at all for chosen dataset:
   if(nrow(releases)==0){
