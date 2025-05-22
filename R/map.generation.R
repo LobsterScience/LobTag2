@@ -6,9 +6,9 @@
 
 generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
                           max.pixels = 800000, map.res = 0.9, inset.option = T, anonymous = F,
-                          oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                          oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                          oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                          oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                          oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                          oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   ## install any extra github packages need for mapping:
   pkg.list <- c("ggsflabel") ## install any github package dependencies
@@ -406,9 +406,9 @@ map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
                           max.pixels = 800000, map.res = 0.9, inset.map=F, set.inset=T, zoom.out = 1,
                           point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
-                          oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                          oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                          oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                          oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                          oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                          oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   if(db %in% c("local","Local","LOCAL")){
     db = "local"
@@ -961,9 +961,9 @@ if(inset.map){
   # file.type = "pdf"
   # extra.zoom = 100
 #
-#   oracle.user = oracle.personal.user
-#   oracle.password = oracle.personal.password
-#   oracle.dbname = oracle.personal.server
+#   oracle.user = oracle.lobtag.user
+#   oracle.password = oracle.lobtag.password
+#   oracle.dbname = oracle.lobtag.server
 }
 
 

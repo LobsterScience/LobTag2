@@ -4,9 +4,9 @@
 #' @export
 
 upload_releases <- function(db = NULL, overwrite.tags = F,
-                            oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
-                            oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
-                            oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL) {
+                            oracle.user =if(exists("oracle.lobtag.user", inherits = T)) oracle.lobtag.user else NULL,
+                            oracle.password = if(exists("oracle.lobtag.password", inherits = T)) oracle.lobtag.password else NULL,
+                            oracle.dbname = if(exists("oracle.lobtag.server", inherits = T)) oracle.lobtag.server else NULL) {
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
 

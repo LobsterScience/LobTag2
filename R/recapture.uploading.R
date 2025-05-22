@@ -4,9 +4,9 @@
 #' @export
 
 upload_recaptures <- function(db = NULL, backups = T,
-                              oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                              oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                              oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                              oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                              oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                              oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
   if(is.null(oracle.user))oracle.user <- ""
@@ -118,7 +118,7 @@ upload_recaptures <- function(db = NULL, backups = T,
 ######################################################################## Main Function:
   ## set backups location
     if(backups){
-      if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG")){
+      if(db  %in% "Oracle" & oracle.user %in% c("LOBSTER")){
         backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit Shared/Projects and Programs/Tagging/Master_data"
       }else{
         dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
@@ -634,9 +634,9 @@ upload_recaptures <- function(db = NULL, backups = T,
 #' @description batch uploads tag recaptures data
 #' @export
 batch_upload_recaptures <- function(db = NULL, backups = T,
-                                    oracle.user =if(exists("oracle.personal.user", inherits = T)) oracle.personal.user else NULL,
-                                    oracle.password = if(exists("oracle.personal.password", inherits = T)) oracle.personal.password else NULL,
-                                    oracle.dbname = if(exists("oracle.personal.server", inherits = T)) oracle.personal.server else NULL){
+                                    oracle.user =if(exists("oracle.lobtag.user", inherits = T)) oracle.lobtag.user else NULL,
+                                    oracle.password = if(exists("oracle.lobtag.password", inherits = T)) oracle.lobtag.password else NULL,
+                                    oracle.dbname = if(exists("oracle.lobtag.server", inherits = T)) oracle.lobtag.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
   if(is.null(oracle.user))oracle.user <- ""
@@ -750,7 +750,7 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 
   ## set backups location
   if(backups){
-    if(db  %in% "Oracle" & oracle.user %in% c("ELEMENTG")){
+    if(db  %in% "Oracle" & oracle.user %in% c("LOBSTER")){
       backup.dir = "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit Shared/Projects and Programs/Tagging/Master_data"
     }else{
       dlg_message("In the following window, choose the directory where you want your backup excel tables to be stored. These will be updated everytime you enter new recaptures.")
@@ -771,9 +771,9 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 
   ## some pre-coordinate formatting error checking
   bad_lat.deg = which(!is.na(rec$LAT_DEGREE) & (nchar(as.character(rec$LAT_DEGREE))<2 | as.numeric(rec$LAT_DEGREE) %in% NA) ) ## these error check degrees and minutes, regardless of whether they get used to generate DD coordinates
-  bad_lat.min = which(!is.na(rec$LAT_MINUTE) & (nchar(as.character(rec$LAT_MINUTE))<2 | as.numeric(rec$LAT_MINUTE) %in% NA) )
+  bad_lat.min = which(!is.na(rec$LAT_MINUTE) & as.numeric(rec$LAT_MINUTE) %in% NA)
   bad_lon.deg = which(!is.na(rec$LON_DEGREE) & (nchar(as.character(rec$LON_DEGREE))<2 | as.numeric(rec$LON_DEGREE) %in% NA) )
-  bad_lon.min = which(!is.na(rec$LON_MINUTE) & (nchar(as.character(rec$LON_MINUTE))<2 | as.numeric(rec$LON_MINUTE) %in% NA) )
+  bad_lon.min = which(!is.na(rec$LON_MINUTE) & as.numeric(rec$LON_MINUTE) %in% NA)
 
   ##ccordinate decimal degrees and degrees minutes formatting done here
   ## account for negative degrees

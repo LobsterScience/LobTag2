@@ -5,9 +5,9 @@
 #' @export
 lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
                            max.pixels = 400000, map.res = 0.9,
-                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   if(db %in% c("local","Local","LOCAL")){
     db = "local"
@@ -427,9 +427,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 #' @export
 send.lobster.letters <- function(db = "Oracle",
                                  auto.authenticate = T,
-                                 oracle.user = oracle.personal.user,
-                                 oracle.password = oracle.personal.password,
-                                 oracle.dbname = oracle.personal.server){
+                                 oracle.user = oracle.lobtag.user,
+                                 oracle.password = oracle.lobtag.password,
+                                 oracle.dbname = oracle.lobtag.server){
 
    ### function for handling special characters when SQL querying
   escape_special_chars <- function(x) {

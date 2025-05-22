@@ -4,9 +4,9 @@
 #' @export
 
 get_table <- function(table= NULL, db = "local",
-                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   ### open db connection
 db_connection(db, oracle.user, oracle.password, oracle.dbname)

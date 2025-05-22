@@ -5,9 +5,9 @@
 #' @export
 
 delete_recaptures <- function(db = NULL,
-                              oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                              oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                              oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                              oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                              oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                              oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
 

@@ -5,9 +5,9 @@
 
 generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
                            neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE, add.land = T,
-                           oracle.user =if(exists("oracle.personal.user")) oracle.personal.user else NULL,
-                           oracle.password = if(exists("oracle.personal.password")) oracle.personal.password else NULL,
-                           oracle.dbname = if(exists("oracle.personal.server")) oracle.personal.server else NULL){
+                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
+                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
 
   if(is.null(db)){return(base::message("You need to specify a database with db = "))}
 
@@ -520,9 +520,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   # library(terra)
   # library(sf)
   # db = "local"
-  # oracle.user = oracle.personal.user
-  # oracle.password = oracle.personal.password
-  # oracle.dbname = oracle.personal.server
+  # oracle.user = oracle.lobtag.user
+  # oracle.password = oracle.lobtag.password
+  # oracle.dbname = oracle.lobtag.server
   # tags = "XY965"
   # depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2")
   # neighborhood = 8
