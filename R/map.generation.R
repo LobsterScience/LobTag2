@@ -5,7 +5,7 @@
 #' @export
 
 generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
-                          max.pixels = 800000, map.res = 0.9, inset.option = T, anonymous = F,
+                          max.pixels = 800000, map.res = 0.9, inset.map=T, inset.option = T, anonymous = F,
                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
@@ -50,10 +50,13 @@ generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NUL
 
 
   ## Allow user to choose whether or not to manually draw inset map
-  inset.result = NULL
-  if(inset.option){
-    inset.result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+  if(inset.map){
+    inset.result = NULL
+    if(inset.option){
+      inset.result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+    }
   }
+
 
   ### open db connection
 db_connection(db, oracle.user, oracle.password, oracle.dbname)
@@ -246,6 +249,8 @@ for (p in people){
     ## change back to 4326 (raster package has some masking issues with sf, so just use ::)
     base <- raster::projectRaster(base,  crs = 4326)
 
+    limits <- sf::st_bbox(base)
+    if(inset.map){
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
     if(!is.null(inset.result) && inset.result$res %in% "yes"){ext.inset <- draw_ext()}else{
 
@@ -268,7 +273,6 @@ for (p in people){
     inset <- raster::projectRaster(inset,  crs = 4326)
 
     ## get dimensions information of base and inset for graph placement
-    limits <- sf::st_bbox(base)
     ylen = as.numeric(limits$ymax-limits$ymin)
     xlen = as.numeric(limits$xmax-limits$xmin)
     left <- as.numeric(limits$xmin)
@@ -280,6 +284,8 @@ for (p in people){
     inset.ylen = as.numeric(inset.lim$ymax-inset.lim$ymin)
     inset.xlen = as.numeric(inset.lim$xmax-inset.lim$xmin)
     inset.ratio = inset.xlen/inset.ylen
+
+    } ## inset.map = T
 
     ## get labels
     rel.lab <- path.pers %>% filter(TID  %in% i) %>% summarise(TID = first(TID),DATE = first(REL_DATE),LAT = first(LAT), LON = first(LON))
@@ -355,6 +361,8 @@ for (p in people){
 
 
     ## inset map
+      if(inset.map){
+
       inset <- normalize_raster_brick(inset)
       b <- gg_raster(inset, maxpixels=300000)+
         geom_sf(data = ext_sf, colour = "red", alpha = 0.1)+
@@ -380,9 +388,13 @@ for (p in people){
         annotation_custom(grob=b1, xmin = inset.right-inset.width, xmax = inset.right, ymin = inset.bottom, ymax = inset.top)
         #annotation_custom(grob=b1, xmin = unit(0.5, "npc") - unit(0.2, "npc"), xmax = unit(1, "npc"), ymin = unit(1, "npc") - unit(0.2, "npc"), ymax = unit(1, "npc"))
       # annotation_custom(grob=b1, xmin = right-ylen/2, xmax = right+ylen/25, ymax = top+ylen/5, ymin = top-ylen/3)
+
+
+      }else{ ## inset.map = F
+        outplot <- a
+      }
       map.person <- iconv(map.person, from = "UTF-8", to = "ASCII//TRANSLIT") ## in case name contains accented e that create problems for ggsave
       ggsave(filename = paste0(map.person,i,".pdf"), path = output.location, plot = outplot, width = 11, height = 10)
-
   }
 
 }
@@ -404,7 +416,7 @@ for (p in people){
 
 map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.for=NULL, map.by=NULL, factor.by=NULL, all.releases = F,
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
-                          max.pixels = 800000, map.res = 0.9, inset.map=F, set.inset=T, zoom.out = 1,
+                          max.pixels = 800000, map.res = 0.9, inset.map=F, inset.option=T, zoom.out = 1,
                           point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
@@ -695,9 +707,12 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     base <- raster::projectRaster(base,  crs = 4326)
 
     if(inset.map){
-      if(set.inset){
+      if(inset.option){
         ## Allow user to choose whether or not to manually draw inset map
         result <- dlgMessage(type = "yesno", message = "Would you like to manually draw the area for the inset map? If No, the inset map will be sized automatically")
+      }else{
+        result = NULL
+        result$res = "no"
       }
     ## retrieve large inset map. Can choose to draw manually, otherwise will be autosized relative to basemap
     if(result$res %in% "yes"){ext.inset_sf <- draw_ext()
