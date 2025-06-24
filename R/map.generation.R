@@ -464,7 +464,8 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   }
 
   if(all.releases){
-    releases <- dbSendQuery(con, "SELECT * FROM LBT_RELEASES")
+    rel.query = ifelse(is.null(tag.prefix),"SELECT * FROM LBT_RELEASES",paste0("SELECT * FROM LBT_RELEASES where TAG_PREFIX= ","'",tag.prefix,"'"))
+    releases <- dbSendQuery(con, rel.query)
     releases <- fetch(releases)
   }else{
     ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
