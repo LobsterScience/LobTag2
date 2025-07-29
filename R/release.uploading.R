@@ -67,6 +67,7 @@ upload_releases <- function(db = NULL, overwrite.tags = F,
     TAG_ID VARCHAR2(50),
     CARAPACE_LENGTH VARCHAR2(50),
     SEX VARCHAR2(10),
+    EGG_STATE VARCHAR2(50),
     SHELL VARCHAR2(10),
     CLAW VARCHAR2(10),
     LAT_DEGREES VARCHAR2(50),
@@ -85,6 +86,8 @@ upload_releases <- function(db = NULL, overwrite.tags = F,
     dbSendQuery(con, sql_statement)
 
   }
+
+
   # Close the connection
   dbDisconnect(con)
 
@@ -105,6 +108,25 @@ dlg_message("In the following window, choose an xlsx file containing your releas
 file_path <- dlg_open(filter = dlg_filters["xls",])$res
 #releases <- read.csv(file_path, na.strings = "")
 releases <- read_xlsx(file_path, na = c("","NA"))
+
+### check if there are user added variables not currently in the table. Ask to integrate
+# add.vars = NULL
+# db_connection(db, oracle.user, oracle.password, oracle.dbname)
+# existing.cols <- dbListFields(con, "LBT_RELEASES")
+# new.vars <- names(releases)[which(!names(releases) %in% existing.cols)]
+# if(length(new.vars>0)){
+#   result <- dlgMessage(type = "yesno", message = paste0("There are additional metadata columns in this table added by the user. Do you want to integrate the columns: ",paste(new.vars,collapse = " , ")," into your releases table in your ",db," database? New columns cannot be removed by this app (must be deleted manually). If you choose no, the extra columns will be removed."))
+#   if(result$res %in% "yes"){
+#     add.vars <- new.vars
+#     for(i in add.vars){
+#       if(db %in% "local"){dbExecute(con, paste0("ALTER TABLE LBT_RELEASES ADD COLUMN ",i," VARCHAR2(100)"))}
+#     }
+#   }else{
+#     releases <- releases %>% dplyr::select(-all_of(new.vars))
+#     }
+# }
+# dbDisconnect(con)
+
 ## Process / standardize the data table
 
 ##ccordinate decimal degrees and degrees minutes formatting done here
@@ -150,7 +172,7 @@ releases$REL_DATE = format(as.Date(releases$REL_DATE, format = "%d/%m/%Y"), "%Y-
 releases$TAG_ID = paste0(releases$TAG_PREFIX,releases$TAG_NUM)
 
 ## retrieve only selected variables if there are extra / differently ordered columns
-select.names = c("SAMPLER"	,"SAMPLER_2",	"AFFILIATION","VESSEL",	"CAPTAIN","PORT",	"MANAGEMENT_AREA",	"DAY",	"MONTH",	"YEAR",	"TAG_COLOR",	"TAG_PREFIX",	"TAG_NUM", "TAG_ID", "CARAPACE_LENGTH",	"SEX",	"SHELL",	"CLAW",	"LAT_DEGREES",	"LAT_MINUTES",	"LON_DEGREES",	"LON_MINUTES", "LATDDMM_MM","LONDDMM_MM","LAT_DD","LON_DD","REL_DATE","COMMENTS")
+select.names = c("SAMPLER"	,"SAMPLER_2",	"AFFILIATION","VESSEL",	"CAPTAIN","PORT",	"MANAGEMENT_AREA",	"DAY",	"MONTH",	"YEAR",	"TAG_COLOR",	"TAG_PREFIX",	"TAG_NUM", "TAG_ID", "CARAPACE_LENGTH",	"SEX","EGG_STATE", "SHELL",	"CLAW",	"LAT_DEGREES",	"LAT_MINUTES",	"LON_DEGREES",	"LON_MINUTES", "LATDDMM_MM","LONDDMM_MM","LAT_DD","LON_DD","REL_DATE","COMMENTS")
 
 rel <- dplyr::select(releases,(all_of(select.names)))
 ## clean variables for problematic characters
@@ -372,7 +394,7 @@ if(!return_error & return_warning){
             rel$PORT[i] = escape_special_chars(rel$PORT[i])
             rel$MANAGEMENT_AREA[i] = escape_special_chars(rel$MANAGEMENT_AREA[i])
             rel$COMMENTS[i] = escape_special_chars(rel$COMMENTS[i])
-            sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+            sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$EGG_STATE[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
             if(db %in% "local"){dbBegin(con)}
             result <- dbSendQuery(con, sql)
             dbCommit(con)
@@ -395,6 +417,7 @@ if(!return_error & return_warning){
         TAG_NUM = '", rel$TAG_NUM[i], "',
         CARAPACE_LENGTH = '", rel$CARAPACE_LENGTH[i], "',
         SEX = '", rel$SEX[i], "',
+        EGG_STATE = '", rel$EGG_STATE[i], "',
         SHELL = '", rel$SHELL[i], "',
         CLAW = '", rel$CLAW[i], "',
         LAT_DEGREES = '", rel$LAT_DEGREES[i], "',
@@ -513,7 +536,7 @@ if(!return_error & return_warning){
     rel$MANAGEMENT_AREA[i] = escape_special_chars(rel$MANAGEMENT_AREA[i])
     rel$COMMENTS[i] = escape_special_chars(rel$COMMENTS[i])
 
-    sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
+    sql <- paste("INSERT INTO ",table_name, " VALUES ('",rel$SAMPLER[i],"', '",rel$SAMPLER_2[i],"', '",rel$AFFILIATION[i],"', '",rel$VESSEL[i],"','",rel$CAPTAIN[i],"','",rel$PORT[i],"','",rel$MANAGEMENT_AREA[i],"','",rel$DAY[i],"','",rel$MONTH[i],"','",rel$YEAR[i],"','",rel$TAG_COLOR[i],"','",rel$TAG_PREFIX[i],"','",rel$TAG_NUM[i],"','",rel$TAG_ID[i],"','",rel$CARAPACE_LENGTH[i],"','",rel$SEX[i],"','",rel$EGG_STATE[i],"','",rel$SHELL[i],"','",rel$CLAW[i],"','",rel$LAT_DEGREES[i],"','",rel$LAT_MINUTES[i],"','",rel$LON_DEGREES[i],"','",rel$LON_MINUTES[i],"','",rel$LATDDMM_MM[i],"','",rel$LONDDMM_MM[i],"','",rel$LAT_DD[i],"','",rel$LON_DD[i],"','",rel$REL_DATE[i],"','",rel$COMMENTS[i],"')", sep = "")
     if(db %in% "local"){dbBegin(con)}
     result <- dbSendQuery(con, sql)
     dbCommit(con)
@@ -537,6 +560,7 @@ if(!return_error & return_warning){
         TAG_NUM = '", rel$TAG_NUM[i], "',
         CARAPACE_LENGTH = '", rel$CARAPACE_LENGTH[i], "',
         SEX = '", rel$SEX[i], "',
+        EGG_STATE = '", rel$EGG_STATE[i], "',
         SHELL = '", rel$SHELL[i], "',
         CLAW = '", rel$CLAW[i], "',
         LAT_DEGREES = '", rel$LAT_DEGREES[i], "',
@@ -622,6 +646,31 @@ if(!return_error & return_warning){
 
   }
 
+
+## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+
+db_connection(db, oracle.user, oracle.password, oracle.dbname)
+if(db %in% "local"){
+  col_info <- dbGetQuery(con, paste0("PRAGMA table_info(", table_name, ");"))
+  for (col in col_info$name){
+    query <- paste0("UPDATE ", table_name, " SET ", col, " = NULL WHERE ", col, " = 'NA'")
+    dbExecute(con, query)
+  }
+}
+if(db %in% "Oracle"){
+  col_info <- dbGetQuery(con, paste0("
+  SELECT column_name
+  FROM all_tab_columns
+  WHERE table_name = '", toupper(table_name), "'
+"))
+  for (col in col_info$COLUMN_NAME){
+    query <- paste0("UPDATE ", table_name, " SET ", col, " = NULL WHERE ", col, " = 'NA'")
+    dbExecute(con, query)
+  }
+}
+
+
+  dbDisconnect(con)
 
 
 #######  SCRAP
