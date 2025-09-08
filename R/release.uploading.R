@@ -442,6 +442,10 @@ if(!return_error & return_warning){
 
         dbDisconnect(con)
 
+          ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+          clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = table_name)
+
+
         ### show interactive info window if there were any tags found to be already entered
         if(nrow(entered)>0 & !overwrite.tags){
 
@@ -495,9 +499,9 @@ if(!return_error & return_warning){
           if(overwrite.tags){no.tags.found = ""}
           output$dynamicUI <- renderUI({
             fluidPage(
-            h3(pase0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
+            h3(paste0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
             ) })
-          }
+        }
 
       })
 
@@ -586,6 +590,10 @@ if(!return_error & return_warning){
 
   dbDisconnect(con)
 
+  ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+  clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = table_name)
+
+
   ### show interactive info window if there were any tags found to be already entered
  if(nrow(entered)>0 & !overwrite.tags){
 
@@ -632,9 +640,11 @@ if(!return_error & return_warning){
         write.csv(entered, file, row.names = FALSE)
       }
     )
+
+
   }
 
-  # Run the application
+  # Run the application (## this is just a warning message about already entered tags,data upload is already done)
   shinyApp(ui = ui, server = server)
 
 
@@ -647,32 +657,6 @@ if(!return_error & return_warning){
   }
 
 
-## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
-
-db_connection(db, oracle.user, oracle.password, oracle.dbname)
-if(db %in% "local"){
-  col_info <- dbGetQuery(con, paste0("PRAGMA table_info(", table_name, ");"))
-  for (col in col_info$name){
-    query <- paste0("UPDATE ", table_name, " SET ", col, " = NULL WHERE ", col, " = 'NA'")
-    dbExecute(con, query)
-  }
-}
-if(db %in% "Oracle"){
-  col_info <- dbGetQuery(con, paste0("
-  SELECT column_name
-  FROM all_tab_columns
-  WHERE table_name = '", toupper(table_name), "'
-"))
-  for (col in col_info$COLUMN_NAME){
-    query <- paste0("UPDATE ", table_name, " SET ", col, " = NULL WHERE ", col, " = 'NA'")
-    dbExecute(con, query)
-  }
-}
-
-
-  dbDisconnect(con)
-
-
 #######  SCRAP
 # new.names= c("Vessel", "Captain", "Port", "MANAGEMENT_AREA", "Sampler", "Sampler 2", "Affiliation", "Day",	"Month", "Year", "Tag Prefix",	"Tag Color", "Tag Num",	"Carapace Length",	"Sex",	"Shell", "Claw", "Lat Degrees",	"Lat Minutes",	"Lon Degrees",	"Lon Minutes", "latddmm.mm", "londdmm.mm", "latdd.dd", "londd.dd", "Date")
 
@@ -682,6 +666,38 @@ if(db %in% "Oracle"){
 # library(DT)
 # library(svDialogs)
 
+
+}
+
+
+#' @title clean_NAs
+#' @import dplyr RSQLite DBI shiny DT
+#' @description function for cleaning improperly stored NA (or NULL or blank) values in database (should be (null) in SQL tables, sometimes gets stored as character NA,NULL,"")
+#' @export
+clean_NAs <- function(db = NULL, oracle.user = NULL, oracle.password = NULL, oracle.dbname = NULL, table.name = NULL, close.con = T){
+  db_connection(db, oracle.user, oracle.password, oracle.dbname)
+  if(db %in% "local"){
+    col_info <- dbGetQuery(con, paste0("PRAGMA table_info(", table.name, ");"))
+    for (col in col_info$name){
+      query <- paste0("UPDATE ", table.name, " SET ", col, " = NULL WHERE ", col, " IN ('NA','NULL','')")
+      dbExecute(con, query)
+    }
+  }
+  if(db %in% "Oracle"){
+    col_info <- dbGetQuery(con, paste0("
+  SELECT column_name
+  FROM all_tab_columns
+  WHERE table_name = '", toupper(table.name), "'
+"))
+    for (col in col_info$COLUMN_NAME){
+      query <- paste0("UPDATE ", table.name, " SET ", col, " = NULL WHERE ", col, " IN ('NA','NULL','')")
+      dbExecute(con, query)
+    }
+  }
+
+if(close.con){
+  dbDisconnect(con)
+}
 
 }
 

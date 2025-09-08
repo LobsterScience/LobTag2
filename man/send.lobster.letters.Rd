@@ -7,9 +7,9 @@
 send.lobster.letters(
   db = "Oracle",
   auto.authenticate = T,
-  oracle.user = oracle.personal.user,
-  oracle.password = oracle.personal.password,
-  oracle.dbname = oracle.personal.server
+  oracle.user = oracle.lobtag.user,
+  oracle.password = oracle.lobtag.password,
+  oracle.dbname = oracle.lobtag.server
 )
 }
 \description{

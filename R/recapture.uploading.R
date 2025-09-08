@@ -143,6 +143,48 @@ upload_recaptures <- function(db = NULL, backups = T,
     # Use shinyjs to include required JavaScript
     shinyjs::useShinyjs(),
 
+    ## adjust functioanlity of specific keys for best user experience
+    ## so Enter produces a Tab effect (good for number pad data entry)
+    tags$script(HTML("
+  document.addEventListener('keydown', function(e) {
+    // Check if Enter was pressed
+    if (e.key === 'Enter') {
+      e.preventDefault();  // Prevent default Enter action
+
+      // Find all focusable elements
+      let focusable = Array.prototype.filter.call(
+        document.querySelectorAll('input, select, textarea, button, [tabindex]'),
+        function(el) {
+          return el.tabIndex >= 0 && !el.disabled && el.offsetParent !== null;
+        }
+      );
+
+      let index = focusable.indexOf(document.activeElement);
+      if (index > -1 && index + 1 < focusable.length) {
+        let next = focusable[index + 1];
+        next.focus();
+
+        // If it's a text input or textarea, select its contents (like Tab does)
+        if (next.tagName === 'INPUT' || next.tagName === 'TEXTAREA') {
+          next.select();
+        }
+      }
+    }
+  });
+")),
+
+    ## so Esc produces undo effect like Ctrl+z
+    tags$script(HTML("
+    document.addEventListener('keydown', function(e) {
+      // Map Esc to Undo
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        document.execCommand('undo');
+      }
+    });
+  ")),
+
+
     # Title
     titlePanel("Upload Recaptured Tags"),
 
@@ -459,6 +501,10 @@ upload_recaptures <- function(db = NULL, backups = T,
 
       # Execute SQL insert statement
       dbExecute(con, sql_1)
+      dbCommit(con)
+
+      ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+      clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = "LBT_RECAPTURES", close.con = F)
 
       # Prepare SQL update/insert statement for the LBT_PEOPLE table and insert data
       if (nchar(input$person) > 0){
@@ -543,7 +589,8 @@ upload_recaptures <- function(db = NULL, backups = T,
           }
         }
           }
-
+        ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+        clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = "LBT_PEOPLE", close.con = F)
       }
 
       ## commit additions to dbase
@@ -551,8 +598,9 @@ upload_recaptures <- function(db = NULL, backups = T,
 
       # Update status
       output$status <- renderText({
-        "The following tag recaptures have been uploaded to the database:"
+        paste0("The following tag recaptures have been uploaded to the database in ",ifelse(db %in% "Oracle",paste0(oracle.user,"."),""),"LBT_RECAPTURES",":")
       })
+
 
       # Add submitted data to the table (using input$ values avoids showing special character corrections)
       current_data <- submitted_data()
@@ -566,7 +614,7 @@ upload_recaptures <- function(db = NULL, backups = T,
       })
 
       ##update excel backups
-      delay(500,
+      delay(200,
             if(backups){
               ### save a backup of updated LBT_CAPTURE and LBT_PEOPLE on shared drive
               rec.tab <- dbSendQuery(con, "select * from LBT_RECAPTURES")
@@ -1036,32 +1084,60 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 
       ## check for already entered recapture events, then upload all new recaptures
       entered =NULL
+      ## make sure any missing values in rec are proper NA
+      rec[rec == "NA"] <- NA
+      rec[rec == ""]   <- NA
+      ## function for replacing an NA values with equivalent NULL in sql queries
+      sql_value <- function(x) {
+        if (is.na(x)) {
+          return("NULL")
+        } else {
+          return(paste0("'", x, "'"))
+        }
+      }
       for(i in 1:nrow(rec)){
 
         ##handle special characters
         person <- rec$PERSON[i]
         person <- escape_special_chars(person)
+        person2 <- rec$PERSON_2[i]
+        person2 <- escape_special_chars(person2)
+        captain <- rec$CAPTAIN[i]
+        captain <- escape_special_chars(captain)
+        vessel <- rec$VESSEL[i]
+        vessel <- escape_special_chars(vessel)
+        management_area <- rec$MANAGEMENT_AREA[i]
+        management_area <- escape_special_chars(management_area)
+        comments <- rec$COMMENTS[i]
+        comments <- escape_special_chars(comments)
 
+        civic <- rec$CIVIC[i]
+        civic <- escape_special_chars(civic)
+        town <- rec$TOWN[i]
+        town <- escape_special_chars(town)
+        province <- rec$PROV[i]
+        province <- escape_special_chars(province)
+        country <- rec$COUNTRY[i]
+        country <- escape_special_chars(country)
+        phone1 <- rec$PHO1[i]
+        phone1 <- escape_special_chars(phone1)
+        phone2 <- rec$PHO2[i]
+        phone2 <- escape_special_chars(phone2)
+        affiliation <- rec$AFFILIATION[i]
+        affiliation <- escape_special_chars(affiliation)
+        license_area <- rec$LICENSE_AREA[i]
+        license_area <- escape_special_chars(license_area)
+
+        ## check if the recapture event already exists
         sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",person,"'", sep = "")
-        #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+
         check <- dbSendQuery(con, sql)
         existing_event <- dbFetch(check)
         entered <- rbind(entered,existing_event)
         dbClearResult(check)
 
+        ## insert recapture data if the recapture is not found
         if(nrow(existing_event)==0){
-
-          #handle special characters
-          person2 <- rec$PERSON_2[i]
-          person2 <- escape_special_chars(person2)
-          captain <- rec$CAPTAIN[i]
-          captain <- escape_special_chars(captain)
-          vessel <- rec$VESSEL[i]
-          vessel <- escape_special_chars(vessel)
-          management_area <- rec$MANAGEMENT_AREA[i]
-          management_area <- escape_special_chars(management_area)
-          comments <- rec$COMMENTS[i]
-          comments <- escape_special_chars(comments)
 
           sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",person,"','",person2,"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",captain,"','",vessel,"','",rec$YEAR[i],"','",management_area,"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','",rec$REWARDED[i],"','",comments,"')", sep = "")
           if(db %in% "local"){dbBegin(con)}
@@ -1070,42 +1146,96 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
           dbClearResult(result)
         }
 
-        ## check and update PEOPLE table if person is new
-        sql <- paste("SELECT * FROM ",people.tab.name, " WHERE NAME = '", person,"'",sep = "")
-        check <- dbSendQuery(con, sql)
-        existing_person <- dbFetch(check)
-        dbClearResult(check)
+        ## update PEOPLE table with any new info (People data for a Name should always update with any new non-empty values, ex. so for batch uploading, the value of EMAIL for "John Smith" will update to whatever the last email uploaded for John Smith was)
+        ## This will always happen, even if the recapture event itself was not uploaded due to being found to already exist
+        if(db  %in% "Oracle"){
+          sql <- paste(
+            "MERGE INTO \"", people.tab.name, "\" tgt",
+            " USING (SELECT ",
+            sql_value(person), " AS \"NAME\", ",
+            sql_value(civic), " AS \"CIVIC\", ",
+            sql_value(town), " AS \"TOWN\", ",
+            sql_value(province), " AS \"PROV\", ",
+            sql_value(country), " AS \"COUNTRY\", ",
+            sql_value(rec$POST[i]), " AS \"POST\", ",
+            sql_value(rec$EMAIL[i]), " AS \"EMAIL\", ",
+            sql_value(phone1), " AS \"PHO1\", ",
+            sql_value(phone2), " AS \"PHO2\", ",
+            sql_value(affiliation), " AS \"AFFILIATION\", ",
+            sql_value(license_area), " AS \"LICENSE_AREA\" ",
+            "FROM dual) src",
+            " ON (tgt.\"NAME\" = src.\"NAME\")",
+            " WHEN MATCHED THEN UPDATE SET",
+            "   tgt.\"CIVIC\" = NVL(src.\"CIVIC\", tgt.\"CIVIC\"),",
+            "   tgt.\"TOWN\" = NVL(src.\"TOWN\", tgt.\"TOWN\"),",
+            "   tgt.\"PROV\" = NVL(src.\"PROV\", tgt.\"PROV\"),",
+            "   tgt.\"COUNTRY\" = NVL(src.\"COUNTRY\", tgt.\"COUNTRY\"),",
+            "   tgt.\"POST\" = NVL(src.\"POST\", tgt.\"POST\"),",
+            "   tgt.\"EMAIL\" = NVL(src.\"EMAIL\", tgt.\"EMAIL\"),",
+            "   tgt.\"PHO1\" = NVL(src.\"PHO1\", tgt.\"PHO1\"),",
+            "   tgt.\"PHO2\" = NVL(src.\"PHO2\", tgt.\"PHO2\"),",
+            "   tgt.\"AFFILIATION\" = NVL(src.\"AFFILIATION\", tgt.\"AFFILIATION\"),",
+            "   tgt.\"LICENSE_AREA\" = NVL(src.\"LICENSE_AREA\", tgt.\"LICENSE_AREA\")",
+            " WHEN NOT MATCHED THEN",
+            " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
+            " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
+            sep = ""
+          )
 
-        if(nrow(existing_person)==0){
-
-          ## handle special characters
-          civic <- rec$CIVIC[i]
-          civic <- escape_special_chars(civic)
-          town <- rec$TOWN[i]
-          town <- escape_special_chars(town)
-          province <- rec$PROV[i]
-          province <- escape_special_chars(province)
-          country <- rec$COUNTRY[i]
-          country <- escape_special_chars(country)
-          phone1 <- rec$PHO1[i]
-          phone1 <- escape_special_chars(phone1)
-          phone2 <- rec$PHO2[i]
-          phone2 <- escape_special_chars(phone2)
-          affiliation <- rec$AFFILIATION[i]
-          affiliation <- escape_special_chars(affiliation)
-          license_area <- rec$LICENSE_AREA[i]
-          license_area <- escape_special_chars(license_area)
-
-          sql <- paste("INSERT INTO ",people.tab.name, " VALUES ('",person,"', '",civic,"', '",town,"', '",province,"','",country,"','",rec$POST[i],"','",rec$EMAIL[i],"','",phone1,"','",phone2,"','",affiliation,"','",license_area,"')", sep = "")
-          if(db %in% "local"){dbBegin(con)}
           result <- dbSendQuery(con, sql)
           dbCommit(con)
           dbClearResult(result)
+
+        }
+        ## RSQLite syntax works differently for this so needs separate query
+        if(db %in% "local"){
+          dbBegin(con)
+
+          ## updates with any new values as long as the new value is not NA (NULL)
+          update_query <- paste0(
+            "UPDATE ", people.tab.name, " SET ",
+            "CIVIC = COALESCE(", sql_value(civic), ", CIVIC), ",
+            "TOWN = COALESCE(", sql_value(town), ", TOWN), ",
+            "PROV = COALESCE(", sql_value(province), ", PROV), ",
+            "COUNTRY = COALESCE(", sql_value(country), ", COUNTRY), ",
+            "POST = COALESCE(", sql_value(rec$POST[i]), ", POST), ",
+            "EMAIL = COALESCE(", sql_value(rec$EMAIL[i]), ", EMAIL), ",
+            "PHO1 = COALESCE(", sql_value(phone1), ", PHO1), ",
+            "PHO2 = COALESCE(", sql_value(phone2), ", PHO2), ",
+            "AFFILIATION = COALESCE(", sql_value(affiliation), ", AFFILIATION), ",
+            "LICENSE_AREA = COALESCE(", sql_value(license_area), ", LICENSE_AREA) ",
+            "WHERE NAME = '", person, "'"
+          )
+
+          # Execute the update query
+          dbExecute(con, update_query)
+
+          # Check if the row was updated
+          affected_rows <- dbGetQuery(con, "SELECT changes() AS affected_rows")
+
+          # If no rows were affected by the update, insert the new row
+          if(affected_rows$affected_rows == 0){
+            insert_query <- paste(
+              "INSERT INTO ", people.tab.name,
+              " (NAME, CIVIC, TOWN, PROV, COUNTRY, POST, EMAIL, PHO1, PHO2, AFFILIATION, LICENSE_AREA)",
+              " VALUES ('", person, "', '", civic, "', '", town, "', '", province, "', '", country, "', '",
+              rec$POST[i], "', '", rec$EMAIL[i], "', '", phone1, "', '", phone2, "', '", affiliation, "', '",
+              license_area, "')", sep = "")
+            dbExecute(con, insert_query)
+          }
+
+
+          dbCommit(con)
         }
 
       }
 
       dbDisconnect(con)
+      ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
+      ## (likely redundant now as updating queries have improved, so shouldn't be any 'NA's slipping in, but if they do this will fix them)
+      clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = table_name)
+      clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = people.tab.name)
+
 
       ### show interactive info window if there were any tags found to be already entered
       if(nrow(entered)>0){
@@ -1211,6 +1341,17 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 
     ## Set variables and check for already entered recapture events, then upload all new recaptures
     entered =NULL
+    ## make sure any missing values in rec are proper NA
+    rec[rec == "NA"] <- NA
+    rec[rec == ""]   <- NA
+    ## function for replacing an NA values with equivalent NULL in sql queries
+    sql_value <- function(x) {
+      if (is.na(x)) {
+        return("NULL")
+      } else {
+        return(paste0("'", x, "'"))
+      }
+    }
     for(i in 1:nrow(rec)){
 
        ##handle special characters
@@ -1244,14 +1385,14 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         license_area <- rec$LICENSE_AREA[i]
         license_area <- escape_special_chars(license_area)
 
-      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND LAT_DD = ", rec$LAT_DD[i]," AND LON_DD = ", rec$LON_DD[i],sep = "")
-      #sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i],"'",sep = "")
+     ## check if the recapture event already exists
       sql <- paste("SELECT * FROM ",table_name, " WHERE TAG_ID = '", rec$TAG_ID[i], "'"," AND REC_DATE = '", rec$REC_DATE[i], "'"," AND PERSON = '",person,"'", sep = "")
       check <- dbSendQuery(con, sql)
       existing_event <- dbFetch(check)
       entered <- rbind(entered,existing_event)
       dbClearResult(check)
 
+      ## insert recapture data if the recapture is not found
       if(nrow(existing_event)==0){
 
         sql <- paste("INSERT INTO ",table_name, " VALUES ('",rec$TAG_PREFIX[i],"', '",rec$TAG_NUMBER[i],"', '",rec$TAG_ID[i],"', '",rec$REC_DATE[i],"','",person,"','",person2,"','",rec$LAT_DEGREE[i],"','",rec$LAT_MINUTE[i],"','",rec$LON_DEGREE[i],"','",rec$LON_MINUTE[i],"','",rec$LAT_DD[i],"','",rec$LON_DD[i],"','",rec$FATHOMS[i],"','",rec$RELEASED[i],"','",captain,"','",vessel,"','",rec$YEAR[i],"','",management_area,"','",rec$CAPTURE_LENGTH[i],"','",rec$SEX[i],"','",rec$EGG_STATE[i],"','",rec$REWARDED[i],"','",comments,"')", sep = "")
@@ -1261,25 +1402,36 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         dbClearResult(result)
       }
 
-      ## update PEOPLE table with any new info
+      ## update PEOPLE table with any new info (People data for a Name should always update with any new non-empty values, ex. so for batch uploading, the value of EMAIL for "John Smith" will update to whatever the last email uploaded for John Smith was)
+      ## This will always happen, even if the recapture event itself was not uploaded due to being found to already exist
       if(db  %in% "Oracle"){
         sql <- paste(
           "MERGE INTO \"", people.tab.name, "\" tgt",
-          " USING (SELECT '", person, "' AS \"NAME\", '", civic, "' AS \"CIVIC\", '", town, "' AS \"TOWN\", '",
-          province, "' AS \"PROV\", '", country, "' AS \"COUNTRY\", '", rec$POST[i], "' AS \"POST\", '", rec$EMAIL[i], "' AS \"EMAIL\", '",
-          phone1, "' AS \"PHO1\", '", phone2, "' AS \"PHO2\", '", affiliation, "' AS \"AFFILIATION\", '", license_area, "' AS \"LICENSE_AREA\" FROM dual) src",
+          " USING (SELECT ",
+          sql_value(person), " AS \"NAME\", ",
+          sql_value(civic), " AS \"CIVIC\", ",
+          sql_value(town), " AS \"TOWN\", ",
+          sql_value(province), " AS \"PROV\", ",
+          sql_value(country), " AS \"COUNTRY\", ",
+          sql_value(rec$POST[i]), " AS \"POST\", ",
+          sql_value(rec$EMAIL[i]), " AS \"EMAIL\", ",
+          sql_value(phone1), " AS \"PHO1\", ",
+          sql_value(phone2), " AS \"PHO2\", ",
+          sql_value(affiliation), " AS \"AFFILIATION\", ",
+          sql_value(license_area), " AS \"LICENSE_AREA\" ",
+          "FROM dual) src",
           " ON (tgt.\"NAME\" = src.\"NAME\")",
           " WHEN MATCHED THEN UPDATE SET",
-          " tgt.\"CIVIC\" = NVL(tgt.\"CIVIC\", src.\"CIVIC\"),",
-          " tgt.\"TOWN\" = NVL(tgt.\"TOWN\", src.\"TOWN\"),",
-          " tgt.\"PROV\" = NVL(tgt.\"PROV\", src.\"PROV\"),",
-          " tgt.\"COUNTRY\" = NVL(tgt.\"COUNTRY\", src.\"COUNTRY\"),",
-          " tgt.\"POST\" = NVL(tgt.\"POST\", src.\"POST\"),",
-          " tgt.\"EMAIL\" = NVL(tgt.\"EMAIL\", src.\"EMAIL\"),",
-          " tgt.\"PHO1\" = NVL(tgt.\"PHO1\", src.\"PHO1\"),",
-          " tgt.\"PHO2\" = NVL(tgt.\"PHO2\", src.\"PHO2\"),",
-          " tgt.\"AFFILIATION\" = NVL(tgt.\"AFFILIATION\", src.\"AFFILIATION\"),",
-          " tgt.\"LICENSE_AREA\" = NVL(tgt.\"LICENSE_AREA\", src.\"LICENSE_AREA\")",
+          "   tgt.\"CIVIC\" = NVL(src.\"CIVIC\", tgt.\"CIVIC\"),",
+          "   tgt.\"TOWN\" = NVL(src.\"TOWN\", tgt.\"TOWN\"),",
+          "   tgt.\"PROV\" = NVL(src.\"PROV\", tgt.\"PROV\"),",
+          "   tgt.\"COUNTRY\" = NVL(src.\"COUNTRY\", tgt.\"COUNTRY\"),",
+          "   tgt.\"POST\" = NVL(src.\"POST\", tgt.\"POST\"),",
+          "   tgt.\"EMAIL\" = NVL(src.\"EMAIL\", tgt.\"EMAIL\"),",
+          "   tgt.\"PHO1\" = NVL(src.\"PHO1\", tgt.\"PHO1\"),",
+          "   tgt.\"PHO2\" = NVL(src.\"PHO2\", tgt.\"PHO2\"),",
+          "   tgt.\"AFFILIATION\" = NVL(src.\"AFFILIATION\", tgt.\"AFFILIATION\"),",
+          "   tgt.\"LICENSE_AREA\" = NVL(src.\"LICENSE_AREA\", tgt.\"LICENSE_AREA\")",
           " WHEN NOT MATCHED THEN",
           " INSERT (\"NAME\", \"CIVIC\", \"TOWN\", \"PROV\", \"COUNTRY\", \"POST\", \"EMAIL\", \"PHO1\", \"PHO2\", \"AFFILIATION\", \"LICENSE_AREA\")",
           " VALUES (src.\"NAME\", src.\"CIVIC\", src.\"TOWN\", src.\"PROV\", src.\"COUNTRY\", src.\"POST\", src.\"EMAIL\", src.\"PHO1\", src.\"PHO2\", src.\"AFFILIATION\", src.\"LICENSE_AREA\")",
@@ -1289,26 +1441,28 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
         result <- dbSendQuery(con, sql)
         dbCommit(con)
         dbClearResult(result)
+
       }
 
+      ## RSQLite syntax works differently for this so needs separate query
       if(db %in% "local"){
         dbBegin(con)
 
-        for(i in seq_len(nrow(rec))){
-          # Construct the UPDATE query
-          update_query <- paste(
-            "UPDATE ", people.tab.name,
-            " SET CIVIC = COALESCE(CIVIC, '", civic, "'),",
-            " TOWN = COALESCE(TOWN, '", town, "'),",
-            " PROV = COALESCE(PROV, '", province, "'),",
-            " COUNTRY = COALESCE(COUNTRY, '", country, "'),",
-            " POST = COALESCE(POST, '", rec$POST[i], "'),",
-            " EMAIL = COALESCE(EMAIL, '", rec$EMAIL[i], "'),",
-            " PHO1 = COALESCE(PHO1, '", phone1, "'),",
-            " PHO2 = COALESCE(PHO2, '", phone2, "'),",
-            " AFFILIATION = COALESCE(AFFILIATION, '", affiliation, "'),",
-            " LICENSE_AREA = COALESCE(LICENSE_AREA, '", license_area, "')",
-            " WHERE NAME = '", person, "'", sep = "")
+        ## updates with any new values as long as the new value is not NA (NULL)
+        update_query <- paste0(
+          "UPDATE ", people.tab.name, " SET ",
+          "CIVIC = COALESCE(", sql_value(civic), ", CIVIC), ",
+          "TOWN = COALESCE(", sql_value(town), ", TOWN), ",
+          "PROV = COALESCE(", sql_value(province), ", PROV), ",
+          "COUNTRY = COALESCE(", sql_value(country), ", COUNTRY), ",
+          "POST = COALESCE(", sql_value(rec$POST[i]), ", POST), ",
+          "EMAIL = COALESCE(", sql_value(rec$EMAIL[i]), ", EMAIL), ",
+          "PHO1 = COALESCE(", sql_value(phone1), ", PHO1), ",
+          "PHO2 = COALESCE(", sql_value(phone2), ", PHO2), ",
+          "AFFILIATION = COALESCE(", sql_value(affiliation), ", AFFILIATION), ",
+          "LICENSE_AREA = COALESCE(", sql_value(license_area), ", LICENSE_AREA) ",
+          "WHERE NAME = '", person, "'"
+        )
 
           # Execute the update query
           dbExecute(con, update_query)
@@ -1326,20 +1480,17 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
               license_area, "')", sep = "")
             dbExecute(con, insert_query)
           }
-        }
+
 
         dbCommit(con)
       }
 
 
-
-
-
-
-
     }
 
     dbDisconnect(con)
+    clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = table_name)
+    clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = people.tab.name)
 
     ### show interactive info window if there were any tags found to be already entered
     if(nrow(entered)>0){
@@ -1448,16 +1599,6 @@ batch_upload_recaptures <- function(db = NULL, backups = T,
 
 
   }
-
-
-
-  # library(dplyr)
-  # library(ROracle)
-  # library(shiny)
-  # library(shinyjs)
-  # library(svDialogs)
-  # library(DT)
-
 
 
 }

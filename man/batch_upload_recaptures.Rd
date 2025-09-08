@@ -7,12 +7,12 @@
 batch_upload_recaptures(
   db = NULL,
   backups = T,
-  oracle.user = if (exists("oracle.personal.user", inherits = T)) oracle.personal.user
-    else NULL,
-  oracle.password = if (exists("oracle.personal.password", inherits = T))
-    oracle.personal.password else NULL,
-  oracle.dbname = if (exists("oracle.personal.server", inherits = T))
-    oracle.personal.server else NULL
+  oracle.user = if (exists("oracle.lobtag.user", inherits = T)) oracle.lobtag.user else
+    NULL,
+  oracle.password = if (exists("oracle.lobtag.password", inherits = T))
+    oracle.lobtag.password else NULL,
+  oracle.dbname = if (exists("oracle.lobtag.server", inherits = T)) oracle.lobtag.server
+    else NULL
 )
 }
 \description{

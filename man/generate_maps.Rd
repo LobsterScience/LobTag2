@@ -15,12 +15,13 @@ generate_maps(
   output.location = NULL,
   max.pixels = 8e+05,
   map.res = 0.9,
+  inset.map = T,
   inset.option = T,
   anonymous = F,
-  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
-  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+  oracle.user = if (exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+  oracle.password = if (exists("oracle.lobtag.password")) oracle.lobtag.password else
     NULL,
-  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
+  oracle.dbname = if (exists("oracle.lobtag.server")) oracle.lobtag.server else NULL
 )
 }
 \description{

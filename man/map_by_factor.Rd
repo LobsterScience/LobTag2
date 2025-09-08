@@ -20,16 +20,16 @@ map_by_factor(
   max.pixels = 8e+05,
   map.res = 0.9,
   inset.map = F,
-  set.inset = T,
+  inset.option = T,
   zoom.out = 1,
   point.size = 1.5,
   file.type = "pdf",
   output.location = NULL,
   dpi = 900,
-  oracle.user = if (exists("oracle.personal.user")) oracle.personal.user else NULL,
-  oracle.password = if (exists("oracle.personal.password")) oracle.personal.password else
+  oracle.user = if (exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
+  oracle.password = if (exists("oracle.lobtag.password")) oracle.lobtag.password else
     NULL,
-  oracle.dbname = if (exists("oracle.personal.server")) oracle.personal.server else NULL
+  oracle.dbname = if (exists("oracle.lobtag.server")) oracle.lobtag.server else NULL
 )
 }
 \description{
