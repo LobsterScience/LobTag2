@@ -499,7 +499,7 @@ if(!return_error & return_warning){
           if(overwrite.tags){no.tags.found = ""}
           output$dynamicUI <- renderUI({
             fluidPage(
-            h3(paste0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
+            h3(paste0("All releases uploaded to ",oracle.user,".",table_name," successfully! There were no errors",no.tags.found,". Close this window."))
             ) })
         }
 
@@ -651,7 +651,7 @@ if(!return_error & return_warning){
  }else{
    no.tags.found = " and none of the tags were found to already exist"
    if(overwrite.tags){no.tags.found = ""}
-   dlg_message(paste0("All releases uploaded successfully! There were no errors",no.tags.found,". Close this window."))
+   dlg_message(paste0("All releases uploaded to ",oracle.user,".",table_name," successfully! There were no errors",no.tags.found,". Close this window."))
   }
 
   }
