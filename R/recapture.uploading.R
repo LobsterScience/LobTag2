@@ -491,17 +491,21 @@ upload_recaptures <- function(db = NULL, backups = T,
 
       if(db %in% "Oracle"){
         sql_1 <- paste("INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person2, "', ", lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ", depth_fathoms, ", '", released, "', '", captain, "', '", vessel, "', EXTRACT(YEAR FROM TO_DATE('", date, "', 'YYYY/MM/DD')), '", management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", comments, "')", sep="")
-      }else{if(db %in% "local")sql_1 <- paste0(
+        # Execute SQL insert statement
+        dbExecute(con, sql_1)
+        dbCommit(con)
+      }
+        if(db %in% "local"){sql_1 <- paste0(
         "INSERT INTO LBT_RECAPTURES (Tag_Prefix, Tag_Number, TAG_ID, REC_DATE, PERSON, PERSON_2, LAT_DEGREE, LAT_MINUTE, LON_DEGREE, LON_MINUTE, LAT_DD, LON_DD, FATHOMS, RELEASED, CAPTAIN, VESSEL, YEAR, MANAGEMENT_AREA, CAPTURE_LENGTH, SEX, EGG_STATE, REWARDED, COMMENTS) ",
         "VALUES ('", tag_prefix, "', ", tag_number, ", '", tag_id, "', '", date, "', '", person, "', '", person2, "', ",
         lat_deg, ", ", lat_dec_min, ", ", long_deg, ", ", long_dec_min, ", ", latitude_dddd, ", ", longitude_dddd, ", ",
         depth_fathoms, ", '", released, "', '", captain, "', '", vessel, "', strftime('%Y', '", date, "'), '",
         management_area, "', ", capture_length, ", ", sex, ", ", egg_state, ", 'no', '", comments, "')"
-      )}
-
+      )
       # Execute SQL insert statement
       dbExecute(con, sql_1)
-      dbCommit(con)
+      }
+
 
       ## as a last cleanup step, convert any character 'NA' values that got introduced during sql updating to NULL to unify missing values format (null values in Oracle will be interpreted correctly as NA when imported back into R)
       clean_NAs(db, oracle.user, oracle.password, oracle.dbname, table.name = "LBT_RECAPTURES", close.con = F)

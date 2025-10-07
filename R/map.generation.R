@@ -418,6 +418,7 @@ map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.
                           show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
                           max.pixels = 800000, map.res = 0.9, inset.map=F, inset.option=T, zoom.out = 1,
                           point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
+                          make.kmz = F, protect.recaptures = F,label.trips = F,
                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
@@ -521,6 +522,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   }
 
   if(tab %in% c("releases","RELEASES","Releases")){
+
+    if(map.by %in% factor.by){releases <- releases %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
+
     rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
 
     ## include optional filter for specific values of factor
@@ -543,6 +547,9 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   }
 
   if(tab %in% c("recaptures","RECAPTURES","Recaptures")){
+
+    if(map.by %in% factor.by){recaptures <- recaptures %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
+
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
 
     ## include optional filter for specific values of factor
@@ -842,11 +849,27 @@ if(is.null(factor.by)){
     if(show.recaptures){
 
       if(!is.null(factor.by1) && factor.by1 %in% colnames(sf_rec)){
-        a <- a+
-          geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]], shape =Event))+
-          geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by1]], shape =Event))+
-          coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
-          theme(plot.margin = margin(t = 73))
+        if(label.trips){
+          rel.trips <- sf_rel %>% group_by(REL_DATE) %>% summarise(TAG_ID = first(TAG_ID), filter_by = first(filter_by),
+                                                                   geometry = first(geometry), Event = first(Event), YEAR = first(YEAR))
+
+          rel.trips <- rel.trips %>% mutate(label.name = paste0(filter_by,": ",REL_DATE))
+
+          a <- a+
+            geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]], shape =Event))+
+            geom_sf(data=rel.trips, size=point.size+2, alpha=0.6, aes(colour = .data[[factor.by]], shape =Event))+
+            geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by1]], shape =Event))+
+            coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+            theme(plot.margin = margin(t = 73))+
+            geom_sf_label_repel(data = rel.trips, aes(label=label.name, colour=YEAR),show.legend=F,nudge_y=-(ylen/10), alpha=0.8,max.overlaps = 20, size = 2.8)
+
+        }else{
+          a <- a+
+            geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]], shape =Event))+
+            geom_sf(data=sf_rec, size=point.size, aes(colour = .data[[factor.by1]], shape =Event))+
+            coord_sf(ylim=as.numeric(c(limits$ymin,limits$ymax)), xlim = as.numeric(c(limits$xmin,limits$xmax)), expand = F)+
+            theme(plot.margin = margin(t = 73))
+        }
       }else{
         a <- a+
           geom_sf(data=sf_rel, size=point.size,aes(colour = .data[[factor.by]]))+
@@ -928,7 +951,7 @@ if(inset.map){
     if(is.null(filter.by)){
       filter.txt <- ""
     }else{
-      filter.txt <- paste0(filter.by,paste(filter.for, collapse = "."),"_")
+      filter.txt <- paste0(filter.by,"_",paste(filter.for, collapse = "."),"_")
     }
     if(is.null(factor.by)){
       factor.txt <- ""
@@ -941,6 +964,30 @@ if(inset.map){
       program = paste0(tag.prefix,"_")
     }
     ggsave(filename = paste0(program,tab,"_",filter.txt,map.txt,factor.txt,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+
+
+    ## if kml (kmz) maps are requested
+    if(make.kmz){
+      sf_rel.kml <- sf_rel %>% dplyr::select(TAG_ID, filter_by, REL_DATE) %>% rename(!!filter.by := filter_by, DATE = REL_DATE) %>% mutate(EVENT = "Release")
+      sf_rec.kml <- sf_rec %>% dplyr::select(TAG_ID, filter_by, REC_DATE) %>% rename( !!filter.by := filter_by, DATE = REC_DATE) %>% mutate(EVENT = "Recapture")
+
+      if(protect.recaptures && "CAPTAIN" %in% names(sf_rec.kml)){
+        if(nrow(sf_rec.kml)>0){
+          sf_rec.kml$CAPTAIN = "Protected B"
+        }
+      }
+
+      sf_points <- rbind(sf_rel.kml,sf_rec.kml)
+
+      ## make maps
+      make_kmz(
+        sf_obj = sf_points,
+        recapture_icon_path = "C:/LOBTAG/extdata/lobster-export.png",
+        kmz_file = paste0(output.location,"/",program,tab,"_",filter.txt,map.txt,".kmz")
+      )
+
+    }
+
 
   }
 
@@ -983,6 +1030,96 @@ if(inset.map){
 }
 
 
+#' @title make_kmz
+#' @import dplyr sf
+#' @description produce kmz (Google Earth) file from sf recaptures and releases table
+#' @export
+
+make_kmz <- function(sf_obj, recapture_icon_path, kmz_file) {
+
+  # Check/install dependencies
+  for (pkg in c("glue", "zip")) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg)
+    }
+    library(pkg, character.only = TRUE)
+  }
+
+  # Temporary folder to build KMZ
+  tmp <- file.path(tempdir(), "kmz_build")
+  dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
+
+  # Copy icon to temp folder
+  icon_filename <- basename(recapture_icon_path)
+  file.copy(recapture_icon_path, file.path(tmp, icon_filename), overwrite = TRUE)
+
+  # KML file inside temp folder
+  kml_file <- file.path(tmp, "doc.kml")
+
+  coords <- sf::st_coordinates(sf_obj)
+  attrs  <- sf::st_drop_geometry(sf_obj)
+  second_col_name <- names(attrs)[2]
+
+  kml_header <- glue('<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <Style id="recapturesIcon">
+    <IconStyle>
+      <scale>1.2</scale>
+      <Icon>
+        <href>{icon_filename}</href>
+      </Icon>
+    </IconStyle>
+  </Style>
+  <Style id="releasesIcon">
+    <IconStyle>
+      <scale>1.2</scale>
+      <Icon>
+        <href>http://maps.google.com/mapfiles/kml/shapes/sailing.png</href>
+      </Icon>
+    </IconStyle>
+  </Style>
+')
+
+  placemarks <- vapply(seq_len(nrow(coords)), function(i) {
+    desc <- paste0(
+      "<![CDATA[<table border='1' cellspacing='0' cellpadding='3'>",
+      paste0(
+        "<tr><td><b>", names(attrs), "</b></td><td>", as.character(attrs[i, ]), "</td></tr>",
+        collapse = ""
+      ),
+      "</table>]]>"
+    )
+
+    if(attrs$EVENT[i] == "Recapture") {
+      style_id <- "recapturesIcon"
+      placemark_name <- as.character(attrs$TAG_ID[i])
+    } else if(attrs$EVENT[i] == "Release") {
+      style_id <- "releasesIcon"
+      #placemark_name <- as.character(attrs[i, second_col_name])
+      placemark_name <- as.character(attrs$TAG_ID[i])
+    } else {
+      style_id <- "recapturesIcon"
+      placemark_name <- paste0("Point ", i)
+    }
+
+    glue('  <Placemark>
+    <name>{placemark_name}</name>
+    <description>{desc}</description>
+    <styleUrl>#{style_id}</styleUrl>
+    <Point><coordinates>{coords[i,1]},{coords[i,2]},0</coordinates></Point>
+  </Placemark>')
+
+  }, FUN.VALUE = character(1))
+
+  kml_footer <- "\n</Document>\n</kml>"
+
+  writeLines(c(kml_header, placemarks, kml_footer), kml_file)
+
+  # Create KMZ (zip KML + PNG)
+  oldwd <- setwd(tmp); on.exit(setwd(oldwd), add = TRUE)
+  zip::zipr(zipfile = kmz_file, files = c("doc.kml", icon_filename))
+}
 
 
 
