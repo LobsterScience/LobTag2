@@ -453,35 +453,97 @@ map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.
   ### open db connection
 db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
-  query = ifelse(is.null(tag.prefix),"SELECT * FROM LBT_RECAPTURES",paste0("SELECT * FROM LBT_RECAPTURES where TAG_PREFIX= ","'",tag.prefix,"'"))
-  recaptures <- dbSendQuery(con, query)
-  recaptures <- fetch(recaptures)
+  if(filter.from %in% c("recaptures","RECAPTURES")){
+    rec.query <- "SELECT * FROM LBT_RECAPTURES"
+    next.conjunction <- " where "
+    if(!is.null(tag.prefix)){rec.query <- paste0(rec.query," where TAG_PREFIX= ","'",tag.prefix,"'")
+    next.conjunction <- " and "
+    }
+    if(!is.null(filter.by)){rec.query <- paste0(rec.query, next.conjunction, all_of(filter.by),"= ","'",filter.for,"'")}
 
-  ##give warning if there are no recaptures at all for chosen dataset:
-  if(nrow(recaptures)==0){
-    warning("Warning! There are no recaptures for the chosen dataset")
-    recaptures[1,]=NA
-    immediate. = T
-  }
+    recaptures <- dbSendQuery(con, rec.query)
+    recaptures <- fetch(recaptures)
 
-  if(all.releases){
-    rel.query = ifelse(is.null(tag.prefix),"SELECT * FROM LBT_RELEASES",paste0("SELECT * FROM LBT_RELEASES where TAG_PREFIX= ","'",tag.prefix,"'"))
-    releases <- dbSendQuery(con, rel.query)
-    releases <- fetch(releases)
-  }else{
+    ##give warning if there are no recaptures at all for chosen dataset:
+    if(nrow(recaptures)==0){
+      stop("There are no recaptures for the chosen dataset!")
+    }
+
+    if(show.releases){
+    ## get releases for chosen recaptures
     ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
     releases <- do.call(rbind, lapply(unique(recaptures$TAG_ID), function(i) {
       cap.samp <- paste0("'", i, "'")
       query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
       dbGetQuery(con, query)
     }))
+
+    ##give warning if there are no releases for chosen dataset:
+    if(nrow(releases)==0){
+      warning("Warning! There is no release information for any of the chosen recaptured tags!", immediate. = T)
+      releases[1,]=NA
+      }
+    }else{
+      ## if not show releases then pull in a table of no data
+      releases <- dbSendQuery(con, "SELECT * FROM LBT_RELEASES WHERE 1= 0")
+      releases <- fetch(releases)
+      releases[1,]=NA
+    }
+
   }
 
-  ##give warning if there are no releases at all for chosen dataset:
-  if(nrow(releases)==0){
-    warning("Warning! There are no releases for the chosen dataset", immediate. = T)
-    releases[1,]=NA
-  }
+
+  if(filter.from %in% c("releases","RELEASES")){
+    rel.query <- "SELECT * FROM LBT_RELEASES"
+    next.conjunction <- " where "
+    if(!is.null(tag.prefix)){
+      rel.query <- paste0(rel.query," where TAG_PREFIX= ","'",tag.prefix,"'")
+      next.conjunction <- " and "
+      }
+    if(!is.null(filter.by)){
+      rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by),"= ","'",filter.for,"'")
+      next.conjunction <- " and "
+    }
+
+    releases <- dbSendQuery(con, rel.query)
+    releases <- fetch(releases)
+
+    ##give warning if there are no releases at all for chosen dataset:
+    if(nrow(releases)==0){
+      stop("There are no releases for the chosen dataset!")
+    }
+
+    if(show.recaptures){
+    ## which releases are captured?
+    ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
+    # recaptures <- do.call(rbind, lapply(unique(releases$TAG_ID), function(i) {
+    #   rel.samp <- paste0("'", i, "'")
+    #   rec.query <- paste0("SELECT * FROM LBT_RECAPTURES WHERE TAG_ID IN (", rel.samp, ")")
+    #   dbGetQuery(con, rec.query)
+    # }))
+
+    ## just bringing in all recaptures seems to be faster than querying by release tag
+    recaptures <- dbSendQuery(con, "SELECT * FROM LBT_RECAPTURES")
+    recaptures <- fetch(recaptures)
+    recaptures <- recaptures %>% filter(TAG_ID %in% releases$TAG_ID)
+
+    if(nrow(recaptures)==0){
+      if(all.releases){warning("Warning! There are no recaptures for the chosen dataset", immediate. = T)
+      recaptures[1,]=NA
+      }else{
+        stop("There are no recaptures for the chosen dataset! Use all.releases = T to see uncaptured releases for the chosen filters.")
+        }
+      }
+    }else{ ## if not show recaptures then pull in a table of no data
+      recaptures <- dbSendQuery(con, "SELECT * FROM LBT_RECAPTURES WHERE 1= 0")
+      recaptures <- fetch(recaptures)
+      recaptures[1,]=NA
+    }
+
+    if(!all.releases){
+      releases <- releases %>% filter(TAG_ID %in% recaptures$TAG_ID)
+      }
+    }
 
   ##create a few more useful filtering variables
   recaptures$MONTH = as.character(month(recaptures$REC_DATE))
@@ -523,12 +585,12 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(tab %in% c("releases","RELEASES","Releases")){
 
-    if(map.by %in% factor.by){releases <- releases %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
+    if(!is.null(map.by) && map.by %in% factor.by){releases <- releases %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
 
     rel.dat <- releases %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REL_DATE")
 
     ## include optional filter for specific values of factor
-    if(!is.null(filter.for)){rel.dat <- rel.dat %>% filter(filter_by %in% filter.for)}
+    #if(!is.null(filter.for)){rel.dat <- rel.dat %>% filter(filter_by %in% filter.for)}
 
     ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
     factor.by1 = NULL
@@ -548,12 +610,12 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(tab %in% c("recaptures","RECAPTURES","Recaptures")){
 
-    if(map.by %in% factor.by){recaptures <- recaptures %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
+    if(!is.null(map.by) && map.by %in% factor.by){recaptures <- recaptures %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
 
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
 
     ## include optional filter for specific values of factor
-    if(!is.null(filter.for)){rec.dat <- rec.dat %>% filter(filter_by %in% filter.for)}
+    #if(!is.null(filter.for)){rec.dat <- rec.dat %>% filter(filter_by %in% filter.for)}
 
     ## check if the user selected factor also exists in the secondary table and rename so it doesn't effect joining
     factor.by1 = NULL
