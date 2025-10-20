@@ -4,7 +4,7 @@
 #' @export
 
 generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
-                           neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE, add.land = T,
+                           neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE, add.land = T, check.land = F,
                            oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                            oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
                            oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
@@ -106,16 +106,28 @@ while(recheck){
   ### open db connection
   db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
-  query = paste0("SELECT * FROM LBT_RECAPTURES")
-  recaptures <- dbSendQuery(con, query)
-  recaptures <- fetch(recaptures)
+  if(tags %in% "all" | length(tags)>1000){
+    rec.query = paste0("SELECT * FROM LBT_RECAPTURES")
+    recaptures <- dbSendQuery(con, rec.query)
+    recaptures <- fetch(recaptures)
 
-  ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
-  releases <- do.call(rbind, lapply(unique(recaptures$TAG_ID), function(i) {
-    cap.samp <- paste0("'", i, "'")
-    query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
-    dbGetQuery(con, query)
-  }))
+    ## IN clauses have 1000 element limits so use a lapply solution to bring in releases
+    releases <- do.call(rbind, lapply(unique(recaptures$TAG_ID), function(i) {
+      cap.samp <- paste0("'", i, "'")
+      rel.query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
+      dbGetQuery(con, rel.query)
+    }))
+  }else{ ## can be done faster if specific (<1000 tags have been chosen)
+    rec.query = paste0("SELECT * FROM LBT_RECAPTURES WHERE TAG_ID IN (","'",paste0(tags,collapse = "', '"),"')")
+    recaptures <- dbSendQuery(con, rec.query)
+    recaptures <- fetch(recaptures)
+    cap.samp <- paste0(recaptures$TAG_ID,collapse = "', '")
+    rel.query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN ('", cap.samp, "')")
+    releases <- dbSendQuery(con, rel.query)
+    releases <- fetch(releases)
+  }
+
+
 
   ## Handle any special characters in names for SQL querying
   ### function for handling special characters
@@ -249,14 +261,17 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
       ##for troubleshooting (can see land pixels closeup. Keep cropped but increase crop size when done; crop greatly improves function speed but too small runs risk of paths not having route to escape land):
       ###################
-      ymax = ymax+0.7
-      ymin = ymin-0.7
-      xmax=xmax+0.7
-      xmin=xmin-0.7
-      # ymax = ymax+0.08
-      # ymin = ymin-0.08
-      # xmax=xmax+0.08
-      # xmin=xmin-0.08
+      if(check.land){
+        ymax = ymax+0.08
+        ymin = ymin-0.08
+        xmax=xmax+0.08
+        xmin=xmin-0.08
+      }else{
+        ymax = ymax+0.7
+        ymin = ymin-0.7
+        xmax=xmax+0.7
+        xmin=xmin-0.7
+      }
       ###################
       extent_values <- extent(xmin,xmax,ymin,ymax)
       r <- crop(r, extent_values)
@@ -311,7 +326,11 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     # Convert SpatRaster to RasterLayer
     r <- as(cost_surface, "Raster")
-    ## plot(r)
+
+    if(check.land){
+      return(plot(r))
+    }
+    ##
 
     ### having any starting points on land will cause a pathing error
     ### so need to check if any releases or recaptures fall on land in the raster
