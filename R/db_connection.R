@@ -9,7 +9,7 @@ db_connection = function(db = NULL, oracle.user = NULL, oracle.password = NULL, 
   if(db %in% "Oracle"){
 
     if (!requireNamespace("ROracle", quietly = TRUE)) {
-      install.packages("ROracle")
+      stop("You need to manually install ROracle to use Oracle functionality with this app.")
     }
     require(ROracle)
 
