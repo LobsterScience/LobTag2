@@ -13,6 +13,7 @@ generate_paths(
   regen.paths = FALSE,
   save.table = FALSE,
   add.land = T,
+  check.land = F,
   oracle.user = if (exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
   oracle.password = if (exists("oracle.lobtag.password")) oracle.lobtag.password else
     NULL,

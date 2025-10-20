@@ -16,7 +16,7 @@ generate_maps(
   max.pixels = 8e+05,
   map.res = 0.9,
   inset.map = T,
-  inset.option = T,
+  inset.option = F,
   anonymous = F,
   oracle.user = if (exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
   oracle.password = if (exists("oracle.lobtag.password")) oracle.lobtag.password else

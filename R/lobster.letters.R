@@ -1,7 +1,7 @@
 
 #' @title  lobster.letters
 #' @description  create reward letters for fishers who report tags, letters contain map and text.
-#' @import ROracle DBI stringi lubridate dplyr sf svDialogs rmarkdown
+#' @import DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
 lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
                            max.pixels = 400000, map.res = 0.9,

@@ -26,6 +26,9 @@ map_by_factor(
   file.type = "pdf",
   output.location = NULL,
   dpi = 900,
+  make.kmz = F,
+  protect.recaptures = F,
+  label.trips = F,
   oracle.user = if (exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
   oracle.password = if (exists("oracle.lobtag.password")) oracle.lobtag.password else
     NULL,
