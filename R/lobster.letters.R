@@ -378,14 +378,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   }
 
-  #   library(ROracle)
-  #   library(DBI)
-  #   library(stringi)
-  #   library(lubridate)
-  #   library(dplyr)
-  #   library(sf)
-  #   library(svDialogs)
-  # library(rmarkdown)
+
 
 
 
@@ -423,7 +416,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
 #' @title  send.lobster.letters
 #' @description  Review and send reward letters to fishers emails.
-#' @import ROracle DBI dplyr shiny svDialogs gmailr
+#' @import DBI dplyr shiny svDialogs gmailr
 #' @export
 send.lobster.letters <- function(db = "Oracle",
                                  auto.authenticate = T,

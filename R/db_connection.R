@@ -1,7 +1,7 @@
 
 #' @title db_connection
 #' @import dplyr RSQLite DBI
-#' @description establishes connection to databse of users choosing
+#' @description establishes connection to database of users choosing
 #' @export
 
 db_connection = function(db = NULL, oracle.user = NULL, oracle.password = NULL, oracle.dbname = NULL){

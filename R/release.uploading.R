@@ -14,20 +14,7 @@ upload_releases <- function(db = NULL, overwrite.tags = F,
     db = "local"
   }
 
-  ## only install / load ROracle if the user chooses Oracle functionality
-  if(db %in% "Oracle"){
-  pkg <- "ROracle"
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    # If not installed, install the package
-    install.packages(pkg)
 
-    # Load the package after installing
-    library(pkg, character.only = TRUE)
-  } else {
-    # If already installed, just load the package
-    library(pkg, character.only = TRUE)
-    }
-  }
   #######################################################
 
   ##################################################################################################
