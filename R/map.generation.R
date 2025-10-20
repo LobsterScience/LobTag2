@@ -5,7 +5,7 @@
 #' @export
 
 generate_maps <- function(db = NULL, people=NULL, all.people = FALSE, tags = NULL, all.tags = FALSE, only.unrewarded = FALSE, map.token = mapbox.token, output.location = NULL,
-                          max.pixels = 800000, map.res = 0.9, inset.map=T, inset.option = T, anonymous = F,
+                          max.pixels = 800000, map.res = 0.9, inset.map=T, inset.option = F, anonymous = F,
                           oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                           oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
                           oracle.dbname = if(exists("oracle.lobtag.server")) oracle.lobtag.server else NULL){
@@ -501,7 +501,11 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       next.conjunction <- " and "
       }
     if(!is.null(filter.by)){
-      rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by),"= ","'",filter.for,"'")
+      if(filter.for %in% NA){ ## special query if the user wants to filter for missing value cases
+        rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by)," IS NULL ")
+      }else{
+        rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by),"= ","'",filter.for,"'")
+      }
       next.conjunction <- " and "
     }
 
@@ -570,8 +574,14 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
     if(!is.null(map.by)){
     map_by <- sub(paste0(".*", ":"), "", map.by)
-    if(tab %in% c("releases","RELEASES")){releases <- releases %>% rename("map_by" = all_of(map_by))}
-    if(tab %in% c("recaptures","RECAPTURES")){recaptures <- recaptures %>% rename("map_by" = all_of(map_by))}
+    if(tab %in% c("releases","RELEASES")){
+      releases <- releases %>% rename("map_by" = all_of(map_by))
+      if(map_by %in% "REL_DATE"){releases <- releases %>% mutate("REL_DATE" = map_by)} ## if map.by is rel date then replace this original column
+      }
+    if(tab %in% c("recaptures","RECAPTURES")){
+      recaptures <- recaptures %>% rename("map_by" = all_of(map_by))
+      if(map_by %in% "REL_DATE"){recaptures <- recaptures %>% mutate("REL_DATE" = map_by)} ## if map.by is rel date then replace this original column
+      }
     }else{
       releases$map_by = "all"
       recaptures$map_by = "all"
@@ -610,7 +620,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(tab %in% c("recaptures","RECAPTURES","Recaptures")){
 
-    if(!is.null(map.by) && map.by %in% factor.by){recaptures <- recaptures %>% mutate(!!factor.by := map_by)} ## if map.by is the same factor as factor by, duplicate this column so original name still exists
+    if(!is.null(map.by) && map.by %in% factor.by){recaptures <- recaptures %>% mutate(!!factor.by := map_by)} ## if map.by is rel.date or the same factor as factor by, duplicate this column so original name still exists
 
     rec.dat <- recaptures %>% dplyr::select(all_of(select.factors),"LAT_DD","LON_DD","REC_DATE")
 
@@ -672,7 +682,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       missing.rec <- max(nrow(rec.points %>% filter(rec.points$LAT_DD %in% NA)),
                          nrow(rec.points %>% filter(rec.points$LON_DD %in% NA)))
       rec.points <- rec.points %>% filter(!rec.points$LAT_DD %in% NA,!rec.points$LON_DD %in% NA)
-      warning(paste("Warning! There are",missing.rec,"tags in the recaptures selection that don't have recapture coordinates. Releases for these will still be mapped."), immediate. = T)
+      warning(paste("There are",missing.rec,"tags in the selection that don't have recapture coordinates. Releases for these will still be mapped."), immediate. = T)
     }
 
     sf_rel <- sf::st_as_sf(rel.points, coords = c("LON_DD","LAT_DD"))
