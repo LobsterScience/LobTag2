@@ -15,6 +15,13 @@ delete_recaptures <- function(db = NULL,
     db = "local"
   }
 
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    if (!requireNamespace("ROracle", quietly = TRUE)) {
+      install.packages("ROracle")
+    }
+    require(ROracle)
+  }
 ####################################################### Main Function:
 
 

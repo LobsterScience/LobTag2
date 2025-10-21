@@ -13,6 +13,14 @@ lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, ou
     db = "local"
   }
 
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    if (!requireNamespace("ROracle", quietly = TRUE)) {
+      install.packages("ROracle")
+    }
+    require(ROracle)
+  }
+
   ## let user select output file location for maps
   if(is.null(output.location)){
     dlg_message("In the following window, choose the directory where you want to keep your letters.")
@@ -432,6 +440,14 @@ send.lobster.letters <- function(db = "Oracle",
       x <- gsub("-", "\\-", x)
     }
     return(x)
+  }
+
+  ## only install / load ROracle if the user chooses Oracle functionality
+  if(db %in% "Oracle"){
+    if (!requireNamespace("ROracle", quietly = TRUE)) {
+      install.packages("ROracle")
+    }
+    require(ROracle)
   }
 
   ## choose location of letters
