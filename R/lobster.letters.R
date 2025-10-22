@@ -3,7 +3,7 @@
 #' @description  create reward letters for fishers who report tags, letters contain map and text.
 #' @import DBI stringi lubridate dplyr sf svDialogs rmarkdown
 #' @export
-lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, output.location = NULL,
+lobster.letters = function(people = NULL, db = "Oracle", only.unrewarded = T, tag.prefix ="XY", check.polygons = F, output.location = NULL,
                            max.pixels = 400000, map.res = 0.9,
                            oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                            oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,
@@ -127,6 +127,8 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   capt.quer <- ROracle::dbSendQuery(con, query)
   captures <- ROracle::fetch(capt.quer)
 
+  ## filter by tagging program
+  captures <- captures %>% filter(TAG_PREFIX %in% tag.prefix)
   ## filter for only those that haven't yet received their reward
   if(only.unrewarded){
     captures <- captures %>% filter(REWARDED %in% "no")
@@ -144,58 +146,67 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
     }
     return(x)
   }
-  ##get tags for selected recaptures
-  cap.tags <- paste0("('",paste(captures$TAG_ID, collapse ="','"),"')")
-  cap.names <- paste0("('",paste(escape_special_chars(captures$PERSON), collapse ="','"),"')")
 
   ##get reamining tables
 
-  query = paste("SELECT * FROM",peopdb, "WHERE NAME IN",cap.names)
-  peep.quer <- ROracle::dbSendQuery(con,query)
-  peopda <- ROracle::fetch(peep.quer)
+  ## IN clauses have 1000 element limits so use a lapply solution to bring in releases (slow but faster than bringing in all releases)
+  relda <- do.call(rbind, lapply(unique(captures$TAG_ID), function(i) {
+    cap.samp <- paste0("'", i, "'")
+    rel.query <- paste0("SELECT * FROM LBT_RELEASES WHERE TAG_ID IN (", cap.samp, ")")
+    dbGetQuery(con, rel.query)
+  }))
 
-  query = paste("SELECT * FROM",reldb, "WHERE TAG_ID IN",cap.tags)
-  rel.quer <- ROracle::dbSendQuery(con,query)
-  relda <- ROracle::fetch(rel.quer)
+  ## resample from recaptures to ensure that recaptures without release info are removed
+  captures <- captures %>% filter(TAG_ID %in% relda$TAG_ID)
+
+  ## people last
+  peep.query = paste("SELECT * FROM",peopdb)
+  peep <- ROracle::dbSendQuery(con,peep.query)
+  peopda <- ROracle::fetch(peep)
+
+  peopda <- peopda %>% filter(NAME %in% captures$PERSON)
 
   ROracle::dbDisconnect(con)
 
-  ##### check which LFAs recaptures fall within by converting to SF objects
-  cap_sf <- st_as_sf(captures, coords = c("LON_DD","LAT_DD"))
-  st_crs(cap_sf) <- 4326
+  if(check.polygons){
+    ##### check which LFAs recaptures fall within by converting to SF objects
+    cap_sf <- st_as_sf(captures, coords = c("LON_DD","LAT_DD"))
+    st_crs(cap_sf) <- 4326
 
-  #### For full polygons:
-  LFA <- read.csv("C:/bio.data/bio.lobster/data/maps/LFAPolys.csv")
-  LFA <- LFA %>% mutate(PID = ifelse(PID  %in% 311, "31A",
-                                     ifelse(PID %in% 312, "31B",PID)))
+    #### For full polygons:
+    LFA <- read.csv("C:/bio.data/bio.lobster/data/maps/LFAPolys.csv")
+    LFA <- LFA %>% mutate(PID = ifelse(PID  %in% 311, "31A",
+                                       ifelse(PID %in% 312, "31B",PID)))
 
-  lfa_poly_list <- NULL
-  for (k in unique(LFA$PID)){
-    lfa <- LFA %>% filter(PID %in% k)
-    sub.box_list <- NULL
-    for(l in 1:max(lfa$SID)){
-      if(nrow(lfa %>% filter(SID %in% l)>0)){
-        sub.box <- lfa %>% filter(SID %in% l)
-        sub.box <- arrange(sub.box,POS) %>% dplyr::select(-PID,-SID,-POS)
-        sub.box <- rbind(sub.box,sub.box[1,])
-        sub.box_list[[as.character(l)]] <- st_polygon(list(as.matrix(sub.box)))
+    lfa_poly_list <- NULL
+    for (k in unique(LFA$PID)){
+      lfa <- LFA %>% filter(PID %in% k)
+      sub.box_list <- NULL
+      for(l in 1:max(lfa$SID)){
+        if(nrow(lfa %>% filter(SID %in% l)>0)){
+          sub.box <- lfa %>% filter(SID %in% l)
+          sub.box <- arrange(sub.box,POS) %>% dplyr::select(-PID,-SID,-POS)
+          sub.box <- rbind(sub.box,sub.box[1,])
+          sub.box_list[[as.character(l)]] <- st_polygon(list(as.matrix(sub.box)))
+        }
       }
+      multipoly <- st_multipolygon(sub.box_list)
+      lfa_poly_list[[k]] <- multipoly
     }
-    multipoly <- st_multipolygon(sub.box_list)
-    lfa_poly_list[[k]] <- multipoly
+
+
+    lfa_sf <- st_sfc(lfa_poly_list, crs = 4326)
+    lfa_sf <- st_sf(lfa_sf, LFA = names(lfa_sf))
+    st_crs(lfa_sf) <- 4326
+    lfa_sf <- lfa_sf %>% filter(!(LFA %in% 41))
+
+    ## join points and polygons to check their association
+    captures_sf <- st_join(cap_sf, lfa_sf, join = st_within)
+    captures_sf <- captures_sf %>% mutate(MANAGEMENT_AREA = LFA)
+    captures <- captures_sf
+    ######
+
   }
-
-
-  lfa_sf <- st_sfc(lfa_poly_list, crs = 4326)
-  lfa_sf <- st_sf(lfa_sf, LFA = names(lfa_sf))
-  st_crs(lfa_sf) <- 4326
-  lfa_sf <- lfa_sf %>% filter(!(LFA %in% 41))
-
-  ## join points and polygons to check their association
-  captures_sf <- st_join(cap_sf, lfa_sf, join = st_within)
-  captures_sf <- captures_sf %>% mutate(MANAGEMENT_AREA = LFA)
-  captures <- captures_sf
-  ######
 
   captures <- captures %>% dplyr::select(TAG_ID,REC_DATE,MANAGEMENT_AREA,YEAR,RELEASED,REWARDED,PERSON) %>% rename(NAME = PERSON)
   peopda <- peopda %>% dplyr::select(NAME,EMAIL,CIVIC,TOWN,PROV,POST,LICENSE_AREA)
@@ -364,7 +375,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
         pdf_file_name = paste(letter_path, per$name, ".pdf", sep = "")
         per$name <- gsub("'", "", per$name, fixed = TRUE)
 
-        charts <- list.files(path = paste0(output.location,"/maps"), pattern = )
+        charts <- list.files(path = paste0(output.location,"/maps"), pattern = per$name)
         c <- c()
         for(j in 1:length(charts)){
         c <- c(c,paste0(output.location,"/maps/",charts[j]))
