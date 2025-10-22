@@ -100,7 +100,7 @@ while(recheck){
   ### open db connection
   db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
-  if(tags %in% "all" | length(tags)>1000){
+  if(any(tags %in% "all") | length(tags)>1000){
     rec.query = paste0("SELECT * FROM LBT_RECAPTURES")
     recaptures <- dbSendQuery(con, rec.query)
     recaptures <- fetch(recaptures)
