@@ -467,7 +467,7 @@ send.lobster.letters <- function(db = "Oracle",
 
   ### Email authentication
   if(auto.authenticate){
-    jsondir2 <- "C:/bio.data/bio.lobster/data/tagging/lobtags_credentials.json"
+    jsondir2 <- "R:/Science/Population Ecology Division/Shared/!PED_Unit17_Lobster/Lobster Unit Shared/Data & Code Files/bio.data/bio.lobster/data/tagging/lobtags_credentials.json"
     # suppress/automate interactive caching options for gargle functions (can't access these when running through html):
     # options(gargle_verbosity = "silent") ## other options are info and debug
     # options(gargle_oauth_cache = TRUE)
