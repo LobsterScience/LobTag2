@@ -402,7 +402,7 @@ for (p in people){
 #' @export
 
 map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.for=NULL, map.by=NULL, factor.by=NULL, all.releases = F,
-                          show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, map.token = mapbox.token,
+                          show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, advanced.filter =NULL, map.token = mapbox.token,
                           max.pixels = 800000, map.res = 0.9, inset.map=F, inset.option=T, zoom.out = 1,
                           point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
                           make.kmz = F, protect.recaptures = F,label.trips = F,
@@ -578,6 +578,20 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
   if(!is.null(factor.by)){
     select.factors <- c(select.factors,factor.by)
+  }
+
+  if(!is.null(advanced.filter)){
+    ## bring in paths
+    sql = paste0("SELECT * FROM LBT_PATH")
+    path <- dbSendQuery(con, sql)
+    path <- fetch(path)
+    sql = paste0("SELECT * FROM LBT_PATHS")
+    paths <- dbSendQuery(con, sql)
+    paths <- fetch(paths)
+    ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
+    paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
+
+    eval(str2lang(advanced.filter))
   }
 
   if(tab %in% c("releases","RELEASES","Releases")){
