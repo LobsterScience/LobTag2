@@ -3,7 +3,7 @@
 #' @description Uses releases and recapture data with spatial/depth information to draw plausible paths of animal movement
 #' @export
 
-generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
+generate_paths <- function(db = NULL, tags = "all", depth.raster.path = system.file("data", "gebco_2025.tif", package = "LobTag2"),
                            neighborhood = 8, type = "least.cost", regen.paths = FALSE, save.table = FALSE, add.land = T, check.land = F,
                            oracle.user =if(exists("oracle.lobtag.user")) oracle.lobtag.user else NULL,
                            oracle.password = if(exists("oracle.lobtag.password")) oracle.lobtag.password else NULL,

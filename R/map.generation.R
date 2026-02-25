@@ -1036,7 +1036,12 @@ if(inset.map){
     }else{
       program = paste0(tag.prefix,"_")
     }
-    ggsave(filename = paste0(program,tab,"_",filter.txt,map.txt,factor.txt,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
+    if(is.null(advanced.filter)){
+      advanced = ""
+    }else{
+      advanced = "advanced.filter.used"
+    }
+    ggsave(filename = paste0(program,tab,"_",filter.txt,map.txt,factor.txt,advanced,".",file.type), path = output.location, plot = outplot, width = 11, height = 10, dpi = dpi)
 
 
     ## if kml (kmz) maps are requested
