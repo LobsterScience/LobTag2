@@ -12,5 +12,5 @@ db_connection(
 )
 }
 \description{
-establishes connection to databse of users choosing
+establishes connection to database of users choosing
 }

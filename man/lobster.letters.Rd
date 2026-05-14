@@ -8,6 +8,8 @@ lobster.letters(
   people = NULL,
   db = "Oracle",
   only.unrewarded = T,
+  tag.prefix = "XY",
+  check.polygons = F,
   output.location = NULL,
   max.pixels = 4e+05,
   map.res = 0.9,

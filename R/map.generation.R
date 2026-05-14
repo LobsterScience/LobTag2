@@ -402,7 +402,7 @@ for (p in people){
 #' @export
 
 map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.for=NULL, map.by=NULL, factor.by=NULL, all.releases = F,
-                          show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, advanced.filter =NULL, map.token = mapbox.token,
+                          show.releases = T, show.recaptures = T, tag.prefix = NULL, add.paths = F, straight.lines = F, advanced.filter =NULL, map.token = mapbox.token,
                           max.pixels = 800000, map.res = 0.9, inset.map=F, inset.option=T, zoom.out = 1,
                           point.size = 1.5, file.type = "pdf", output.location = NULL, dpi= 900,
                           make.kmz = F, protect.recaptures = F,label.trips = F,
@@ -429,6 +429,31 @@ map_by_factor <- function(db = NULL, filter.from = NULL, filter.by=NULL, filter.
     }
   }
   ####################################################### Main Function:
+
+
+  ## function for bringing in path data if it's needed
+  get.paths <- function(recs = recaptures){
+    ## bring in paths
+    sql = paste0("SELECT * FROM LBT_PATH")
+    path <- dbSendQuery(con, sql)
+    path <- fetch(path)
+    sql = paste0("SELECT * FROM LBT_PATHS")
+    paths <- dbSendQuery(con, sql)
+    paths <- fetch(paths)
+    ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
+    paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
+
+    ## whenever paths are being used, check if all recaptures have paths generated, warn user if not - check for each program
+    for(i in unique(recs$TAG_PREFIX)){
+     rec <- recs %>% filter(TAG_PREFIX %in% i)
+     p <- path %>% filter(TAG_PREFIX %in% i)
+     if(nrow(rec %>% filter(!TAG_ID %in% p$TID))>0){warning(paste0("There are recaptures for the chosen selection in the ",i," program that don't have paths generated!"),immediate. = T)}
+    }
+
+    pdat <- list(path=path, paths=paths)
+    list2env(pdat, envir = parent.frame())
+
+  }
 
 
       ## let user select output file location for maps
@@ -488,10 +513,10 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
       next.conjunction <- " and "
       }
     if(!is.null(filter.by)){
-      if(filter.for %in% NA){ ## special query if the user wants to filter for missing value cases
+      if(any(filter.for %in% NA)){ ## special query if the user wants to filter for missing value cases
         rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by)," IS NULL ")
       }else{
-        rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by),"= ","'",filter.for,"'")
+        rel.query <- paste0(rel.query, next.conjunction, all_of(filter.by)," IN (","'",paste(filter.for, collapse = "','"),"')")
       }
       next.conjunction <- " and "
     }
@@ -581,15 +606,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
   }
 
   if(!is.null(advanced.filter)){
-    ## bring in paths
-    sql = paste0("SELECT * FROM LBT_PATH")
-    path <- dbSendQuery(con, sql)
-    path <- fetch(path)
-    sql = paste0("SELECT * FROM LBT_PATHS")
-    paths <- dbSendQuery(con, sql)
-    paths <- fetch(paths)
-    ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
-    paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
+    get.paths()
 
     eval(str2lang(advanced.filter))
   }
@@ -652,16 +669,7 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
 
   if(add.paths){
-    ## bring in paths
-    sql = paste0("SELECT * FROM LBT_PATH")
-    path <- dbSendQuery(con, sql)
-    path <- fetch(path)
-    sql = paste0("SELECT * FROM LBT_PATHS")
-    paths <- dbSendQuery(con, sql)
-    paths <- fetch(paths)
-
-    ## can't seem to trust Oracle to maintain sorting for all tag events, so do a safety re-sort
-    paths <- paths %>% arrange(TID,as.numeric(CID),as.numeric(POS))
+    get.paths()
   }
 
 
@@ -711,6 +719,32 @@ db_connection(db, oracle.user, oracle.password, oracle.dbname)
 
       path_sf <- sf::st_sfc(lines_list, crs=4326)
       sf::st_crs(path_sf) <- 4326
+    }
+
+
+    if(straight.lines){
+
+    sf_rel <- sf_rel %>%
+      mutate(date = as.Date(REL_DATE)) %>%
+      dplyr::select(TAG_ID, date, geometry)
+
+    sf_rec <- sf_rec %>%
+      mutate(date = as.Date(REC_DATE)) %>%
+      dplyr::select(TAG_ID, date, geometry)
+
+    # 2. Combine
+    all_pts <- bind_rows(sf_rel, sf_rec)
+
+    # 3. Ensure release is first, then chronological
+    all_pts <- all_pts %>%
+      arrange(TAG_ID, date)
+
+    # 4. Build LINESTRING per TAG_ID
+    path_sf <- all_pts %>%
+      group_by(TAG_ID) %>%
+      summarise(geometry = st_cast(st_combine(geometry), "LINESTRING"),
+                .groups = "drop")
+
     }
 
     ## Set mapping area

@@ -16,6 +16,7 @@ map_by_factor(
   show.recaptures = T,
   tag.prefix = NULL,
   add.paths = F,
+  advanced.filter = NULL,
   map.token = mapbox.token,
   max.pixels = 8e+05,
   map.res = 0.9,

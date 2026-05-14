@@ -7,7 +7,7 @@
 generate_paths(
   db = NULL,
   tags = "all",
-  depth.raster.path = system.file("data", "gebco_2024.tif", package = "LobTag2"),
+  depth.raster.path = system.file("data", "gebco_2025.tif", package = "LobTag2"),
   neighborhood = 8,
   type = "least.cost",
   regen.paths = FALSE,
